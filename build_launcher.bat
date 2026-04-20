@@ -36,44 +36,61 @@ if errorlevel 1 (
 cd ..\..
 echo      OK.
 
-REM --- 6. Package to EXE with custom icon ---
-echo [3/4] Packaging to EXE (this may take a minute)...
-if exist dist\launcher rmdir /s /q dist\launcher
+REM --- 6. Build native image with GraalVM ---
+echo [3/4] Building native executable (this may take 2-3 minutes)...
+if not exist dist\launcher mkdir dist\launcher
 
-REM Check if custom icon exists
-set ICON_ARG=
-if exist icons\server.ico (
-    set ICON_ARG=--icon icons\server.ico
-    echo      Using custom icon: icons\server.ico
-) else (
-    echo      No custom icon found. Using default.
-    echo      To add icon: place server.ico in icons\ folder
-)
-
-jpackage ^
-  --type app-image ^
-  --name RemotePC-Server-Installer ^
-  --input build\launcher ^
-  --main-jar launcher.jar ^
-  --main-class ServerLauncher ^
-  --dest dist\launcher ^
-  %ICON_ARG% ^
-  --win-console
-
+REM Check if native-image is available
+where native-image >nul 2>nul
 if errorlevel 1 (
-    echo FAILED: jpackage error.
+    echo FAILED: GraalVM native-image not found.
+    echo Please install GraalVM and run: gu install native-image
     pause
     exit /b 1
 )
+
+REM Build native image
+cd build\launcher
+native-image ^
+  -jar launcher.jar ^
+  -H:Name=RemotePC-Server-Installer ^
+  -H:+ReportExceptionStackTraces ^
+  --no-fallback ^
+  --verbose
+
+if errorlevel 1 (
+    echo FAILED: native-image build error.
+    cd ..\..
+    pause
+    exit /b 1
+)
+
+REM Move exe to dist
+move RemotePC-Server-Installer.exe ..\..\dist\launcher\
+cd ..\..
 echo      OK.
 
-echo [4/4] Done!
-echo.
-echo ==> Result: dist\launcher\RemotePC-Server-Installer\RemotePC-Server-Installer.exe
-echo     Double-click to download and run server.
-echo.
-if not exist icons\server.ico (
-    echo TIP: Add icons\server.ico for custom icon, then rebuild.
+REM --- 7. Add icon to EXE (optional) ---
+echo [4/4] Adding icon...
+if exist icons\server.ico (
+    REM Use ResourceHacker if available
+    where rcedit >nul 2>nul
+    if not errorlevel 1 (
+        rcedit dist\launcher\RemotePC-Server-Installer.exe --set-icon icons\server.ico
+        echo      Icon added!
+    ) else (
+        echo      rcedit not found. Install via: npm install -g rcedit
+        echo      EXE created without custom icon.
+    )
+) else (
+    echo      No icon file found at icons\server.ico
 )
+
+echo.
+echo Done!
+echo.
+echo ==> Result: dist\launcher\RemotePC-Server-Installer.exe
+echo     Single standalone executable (~15MB)
+echo     No JRE required!
 echo.
 pause
