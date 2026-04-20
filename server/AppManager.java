@@ -59,7 +59,6 @@ public class AppManager {
                 "textinputhost", "searchapp", "startmenuexperiencehost",
                 "shellexperiencehost", "runtimebroker",
                 "windowsinternal.composableshell.experiences.textinput.inputapp",
-                "explorer",        // Desktop/taskbar, not File Explorer windows
                 "svchost",         // Windows services host
                 "sihost",          // Shell Infrastructure Host
                 "taskhostw"        // Task Host Window
@@ -92,8 +91,22 @@ public class AppManager {
                         continue;
                     }
 
-                    // Use friendly name if available, fallback to process name
-                    String displayName = (appName != null && !appName.isEmpty()) ? appName : processName;
+                    // Skip Explorer with no window title (desktop/taskbar), but keep File Explorer windows
+                    if (processName.equalsIgnoreCase("explorer") &&
+                        (windowTitle.isEmpty() || windowTitle.equals("(No Title)"))) {
+                        System.out.println("[APP MANAGER] Filtered out desktop explorer");
+                        continue;
+                    }
+
+                    // For UWP apps (ApplicationFrameHost), use WindowTitle as display name
+                    String displayName;
+                    if (processName.equalsIgnoreCase("ApplicationFrameHost")) {
+                        // Use window title for UWP apps (Mail, Clock, etc.)
+                        displayName = windowTitle.isEmpty() ? appName : windowTitle;
+                    } else {
+                        // Use friendly name if available, fallback to process name
+                        displayName = (appName != null && !appName.isEmpty()) ? appName : processName;
+                    }
 
                     // Format output with ProcessName so user knows what to use for Stop/Start
                     String appInfo = String.format("%-30s (%-20s)  PID: %-8s  Mem: %4s MB",
