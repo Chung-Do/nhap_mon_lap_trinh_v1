@@ -31,9 +31,13 @@ public class AppManager {
             System.out.println("[APP MANAGER] Using PowerShell to get Apps with GUI (MainWindowTitle)...");
 
             // PowerShell: Get processes with MainWindowTitle (= Apps in Task Manager)
+            // Get FileDescription (friendly name) like Task Manager shows
+            // Use PrivateMemorySize64 (Private Bytes) for accurate memory like Task Manager
             // Use CSV format for accurate parsing
             String psCommand = "Get-Process | Where-Object {$_.MainWindowTitle -ne ''} | " +
-                             "Select-Object ProcessName, Id, MainWindowTitle, @{N='MemMB';E={[int]($_.WS/1MB)}} | " +
+                             "Select-Object ProcessName, Id, MainWindowTitle, " +
+                             "@{N='AppName';E={try{$_.MainModule.FileVersionInfo.FileDescription}catch{$_.ProcessName}}}, " +
+                             "@{N='MemMB';E={[math]::Round($_.PrivateMemorySize64/1MB, 1)}} | " +
                              "ConvertTo-Csv -NoTypeInformation";
 
             ProcessBuilder pb = new ProcessBuilder("powershell", "-Command", psCommand);
@@ -68,13 +72,14 @@ public class AppManager {
                     }
                 }
 
-                // Parse CSV line: "ProcessName","Id","MainWindowTitle","MemMB"
+                // Parse CSV line: "ProcessName","Id","MainWindowTitle","AppName","MemMB"
                 String[] parts = line.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)"); // Split CSV respecting quotes
-                if (parts.length >= 4) {
+                if (parts.length >= 5) {
                     String processName = parts[0].replace("\"", "").trim();
                     String pid = parts[1].replace("\"", "").trim();
                     String windowTitle = parts[2].replace("\"", "").trim();
-                    String memMB = parts[3].replace("\"", "").trim();
+                    String appName = parts[3].replace("\"", "").trim();
+                    String memMB = parts[4].replace("\"", "").trim();
 
                     // Filter out system UI apps
                     if (systemApps.contains(processName.toLowerCase())) {
@@ -82,9 +87,12 @@ public class AppManager {
                         continue;
                     }
 
+                    // Use friendly name if available, fallback to process name
+                    String displayName = (appName != null && !appName.isEmpty()) ? appName : processName;
+
                     // Format output
-                    String appInfo = String.format("%-25s PID: %-8s  Mem: %4s MB  [%s]",
-                                                   processName, pid, memMB, windowTitle);
+                    String appInfo = String.format("%-30s PID: %-8s  Mem: %4s MB",
+                                                   displayName, pid, memMB);
 
                     result.append(appInfo).append("\n");
                     count++;
