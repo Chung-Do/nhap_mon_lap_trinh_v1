@@ -35,6 +35,71 @@ public class WebcamCapture {
     }
 
     /**
+     * LIST tat ca camera co san tren he thong (Windows)
+     * @param out Output stream to client
+     */
+    public static void listCameras(DataOutputStream out) throws IOException {
+        System.out.println("[CAMERA LIST] ========== LISTING CAMERAS ==========");
+
+        try {
+            String ffmpeg = getFFmpeg();
+            System.out.println("[CAMERA LIST] FFmpeg path: " + ffmpeg);
+
+            // Windows: list devices
+            ProcessBuilder pb = new ProcessBuilder(ffmpeg, "-list_devices", "true", "-f", "dshow", "-i", "dummy");
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
+
+            // Doc output va tim tat ca camera
+            BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+            String line;
+            boolean foundVideoSection = false;
+            StringBuilder cameraList = new StringBuilder();
+            int count = 0;
+
+            while ((line = reader.readLine()) != null) {
+                // Windows: Tim dong chua ten camera trong dau ""
+                if (line.contains("DirectShow video devices") || line.contains("dshow")) {
+                    foundVideoSection = true;
+                }
+                if (foundVideoSection && line.contains("\"")) {
+                    // Extract ten camera tu dong nhu: [dshow @ ...] "Camera Name"
+                    int start = line.indexOf("\"");
+                    int end = line.indexOf("\"", start + 1);
+                    if (start != -1 && end != -1) {
+                        String cameraName = line.substring(start + 1, end);
+                        count++;
+                        cameraList.append(count).append(". ").append(cameraName).append("\n");
+                        System.out.println("[CAMERA LIST] Found: " + cameraName);
+                    }
+                }
+                // Dung khi het phan video devices
+                if (foundVideoSection && line.contains("DirectShow audio devices")) {
+                    break;
+                }
+            }
+
+            p.waitFor();
+
+            if (count == 0) {
+                System.out.println("[CAMERA LIST] No cameras found");
+                sendError(out, "Khong tim thay camera nao tren he thong.\nVui long kiem tra:\n1. Camera da duoc cam?\n2. Driver camera da cai?\n3. Camera co hoat dong khong?");
+            } else {
+                System.out.println("[CAMERA LIST] Total cameras found: " + count);
+                out.writeUTF(JsonUtil.textResponse("OK",
+                    "=== DANH SACH CAMERA ===\n\n" + cameraList.toString() +
+                    "\n━━━━━━━━━━━━━━━━━━━━━━━━\nTong so: " + count + " camera"));
+                out.flush();
+            }
+
+        } catch (Exception e) {
+            System.err.println("[CAMERA LIST] ERROR: " + e.getMessage());
+            e.printStackTrace();
+            sendError(out, "Loi khi quet camera: " + e.getMessage());
+        }
+    }
+
+    /**
      * Auto-detect camera dau tien co san tren he thong
      * @return Ten camera dau tien, hoac null neu khong tim thay
      */
@@ -141,8 +206,8 @@ public class WebcamCapture {
             switch (quality.toLowerCase()) {
                 case "low":
                     resolution = "320x240";
-                    jpegQuality = "5"; // Low quality, fast
-                    System.out.println("[WEBCAM DEBUG] ⚡ FAST MODE: 320x240, Q=5");
+                    jpegQuality = "8"; // Lower quality but MUCH faster
+                    System.out.println("[WEBCAM DEBUG] ⚡ FAST MODE: 320x240, Q=8");
                     break;
                 case "high":
                     resolution = "1280x720";
@@ -151,18 +216,21 @@ public class WebcamCapture {
                     break;
                 case "medium":
                 default:
-                    resolution = "640x480";
-                    jpegQuality = "3"; // Balanced
-                    System.out.println("[WEBCAM DEBUG] ⚖️ BALANCED: 640x480, Q=3");
+                    resolution = "320x240";  // CHANGED: Use low res for speed
+                    jpegQuality = "5"; // Medium quality, fast
+                    System.out.println("[WEBCAM DEBUG] ⚖️ BALANCED (FAST): 320x240, Q=5");
                     break;
             }
 
-            // Windows: dung dshow with optimization
+            // Windows: dung dshow with optimization (FAST MODE)
             String[] command = new String[]{
                 ffmpeg,
                 "-f", "dshow",
                 "-video_size", resolution,
-                "-rtbufsize", "100M",  // Buffer size
+                "-rtbufsize", "10M",  // Reduced buffer size for faster startup
+                "-probesize", "10M",  // Reduce probe time
+                "-fflags", "nobuffer", // No buffering
+                "-flags", "low_delay", // Low latency mode
                 "-i", "video=" + cameraName,
                 "-frames:v", "1",
                 "-q:v", jpegQuality,  // JPEG quality (1-31, lower = better)
@@ -175,9 +243,11 @@ public class WebcamCapture {
             pb.redirectErrorStream(true);
             Process p = pb.start();
 
-            // Doc output de tranh bi block VA log ra
-            System.out.println("[WEBCAM DEBUG] FFmpeg output:");
-            consumeStreamWithLog(p.getInputStream());
+            // Doc output de tranh bi block NHUNG KHONG LOG (faster)
+            new Thread(() -> {
+                try { consumeStream(p.getInputStream()); }
+                catch (Exception ignored) {}
+            }).start();
 
             int exitCode = p.waitFor();
             System.out.println("[WEBCAM DEBUG] FFmpeg exit code: " + exitCode);

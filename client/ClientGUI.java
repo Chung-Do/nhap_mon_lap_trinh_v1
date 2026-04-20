@@ -46,6 +46,7 @@ public class ClientGUI extends JFrame {
     private byte[]  lastVideo;
     private JTextField cameraNameField;  // Input cho ten camera
     private JComboBox<String> qualityComboBox;  // Quality selector
+    private java.util.List<String> availableCameras = new java.util.ArrayList<>();  // Danh sach camera da quet
 
     // ── Webcam Stream ─────────────────────────────────────────────────────────
     private JPanel        webcamStreamPanel;
@@ -415,17 +416,27 @@ public class ClientGUI extends JFrame {
         // Controls
         JPanel streamCtrl = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
 
-        // Camera name input
+        // Camera selector - Quet va chon camera
         streamCtrl.add(new JLabel("Camera:"));
+
+        JButton scanCameraBtn = new JButton("🔍 Quet");
+        scanCameraBtn.setToolTipText("Quet danh sach camera tren server");
+        scanCameraBtn.setBackground(new Color(0x1976D2));
+        scanCameraBtn.setForeground(Color.WHITE);
+        scanCameraBtn.setOpaque(true);
+        scanCameraBtn.setBorderPainted(false);
+        scanCameraBtn.setFocusPainted(false);
+        scanCameraBtn.addActionListener(e -> scanCameras());
+        streamCtrl.add(scanCameraBtn);
+
         cameraNameField = new JTextField("", 18);
-        cameraNameField.setToolTipText("De trong de auto-detect, hoac nhap ten camera (VD: Samsung Slimfit Cam)");
+        cameraNameField.setToolTipText("Chon tu dropdown sau khi quet, hoac de trong de auto-detect");
         streamCtrl.add(cameraNameField);
 
-        // Info label
-        JLabel autoDetectLabel = new JLabel("(De trong = Auto-detect)");
-        autoDetectLabel.setForeground(Color.GRAY);
-        autoDetectLabel.setFont(autoDetectLabel.getFont().deriveFont(10f));
-        streamCtrl.add(autoDetectLabel);
+        JButton selectCameraBtn = new JButton("▼");
+        selectCameraBtn.setToolTipText("Chon camera tu danh sach da quet");
+        selectCameraBtn.addActionListener(e -> showCameraSelection());
+        streamCtrl.add(selectCameraBtn);
 
         // Quality selector
         streamCtrl.add(new JLabel("  Quality:"));
@@ -921,6 +932,71 @@ public class ClientGUI extends JFrame {
             case 1: return "medium"; // Medium (Balanced)
             case 2: return "high";   // High (Quality)
             default: return "medium";
+        }
+    }
+
+    /**
+     * Quet danh sach camera tren server
+     */
+    private void scanCameras() {
+        runTask(() -> {
+            conn.sendCommand(JsonUtil.buildCommand("LIST_CAMERAS"));
+            String response = conn.readTextResponse();
+            String data = extract(response);
+
+            if (response.contains("\"status\":\"OK\"")) {
+                // Parse danh sach camera tu response
+                availableCameras.clear();
+                String[] lines = data.split("\n");
+                for (String line : lines) {
+                    line = line.trim();
+                    // Tim dong dang: "1. Camera Name"
+                    if (line.matches("^\\d+\\.\\s+.+$")) {
+                        String cameraName = line.substring(line.indexOf('.') + 1).trim();
+                        availableCameras.add(cameraName);
+                    }
+                }
+
+                SwingUtilities.invokeLater(() -> {
+                    JOptionPane.showMessageDialog(this, data, "Danh sach Camera", JOptionPane.INFORMATION_MESSAGE);
+                    if (!availableCameras.isEmpty()) {
+                        // Tu dong chon camera dau tien
+                        cameraNameField.setText(availableCameras.get(0));
+                    }
+                });
+                log("SCAN CAMERA: Found " + availableCameras.size() + " camera(s)");
+            } else {
+                SwingUtilities.invokeLater(() -> {
+                    showErr("Loi quet camera:\n" + data);
+                });
+                log("SCAN CAMERA ERROR: " + data);
+            }
+        });
+    }
+
+    /**
+     * Hien thi dialog chon camera tu danh sach da quet
+     */
+    private void showCameraSelection() {
+        if (availableCameras.isEmpty()) {
+            showErr("Chua co danh sach camera!\nVui long bam nut 'Quet' truoc.");
+            return;
+        }
+
+        String[] options = availableCameras.toArray(new String[0]);
+        String selected = (String) JOptionPane.showInputDialog(
+            this,
+            "Chon camera:",
+            "Chon Camera",
+            JOptionPane.QUESTION_MESSAGE,
+            null,
+            options,
+            options[0]
+        );
+
+        if (selected != null) {
+            cameraNameField.setText(selected);
+            log("Selected camera: " + selected);
         }
     }
 

@@ -108,6 +108,9 @@ public class ClientHandler implements Runnable {
                 break;
 
             // ── Webcam ──
+            case "LIST_CAMERAS":
+                WebcamCapture.listCameras(out);
+                break;
             case "WEBCAM_CAPTURE":
                 String cameraCapture = JsonUtil.extractValue(json, "camera");
                 String qualityCapture = JsonUtil.extractValue(json, "quality");
