@@ -28,103 +28,58 @@ public class AppManager {
      */
     private static String listAppsWindows() {
         try {
-            System.out.println("[APP MANAGER] Executing Windows tasklist...");
-            // Use tasklist with TABLE format for better compatibility
-            ProcessBuilder pb = new ProcessBuilder("tasklist", "/FO", "TABLE");
+            System.out.println("[APP MANAGER] Using PowerShell to get Apps with GUI (MainWindowTitle)...");
+
+            // PowerShell: Get processes with MainWindowTitle (= Apps in Task Manager)
+            // Only processes with visible main window are shown in "Apps" section
+            String psCommand = "Get-Process | Where-Object {$_.MainWindowTitle -ne ''} | " +
+                             "Select-Object Name, Id, MainWindowTitle, @{N='MemMB';E={[int]($_.WS/1MB)}} | " +
+                             "Format-Table -AutoSize | Out-String -Width 300";
+
+            ProcessBuilder pb = new ProcessBuilder("powershell", "-Command", psCommand);
             pb.redirectErrorStream(true);
             Process p = pb.start();
 
-            // Fix: Use Windows console encoding (CP850/OEM)
-            String encoding = System.getProperty("os.name").toLowerCase().contains("win") ? "CP850" : "UTF-8";
-            BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream(), encoding));
+            BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream(), "UTF-8"));
 
             StringBuilder result = new StringBuilder();
-            result.append("=== RUNNING APPLICATIONS ===\n\n");
+            result.append("=== RUNNING APPLICATIONS (Apps with GUI) ===\n\n");
 
             String line;
             int count = 0;
-            int lineNum = 0;
-            Set<String> seenNames = new LinkedHashSet<>(); // Track unique app names
+            boolean headerSkipped = false;
 
             while ((line = reader.readLine()) != null) {
-                lineNum++;
                 line = line.trim();
 
-                // Skip empty lines and headers
-                if (line.isEmpty() || lineNum <= 3) continue;
+                // Skip empty lines
+                if (line.isEmpty()) continue;
 
-                // Parse TABLE format (fixed width columns)
-                // Format: ImageName    PID    SessionName    Session#    MemUsage
-
-                // Split by whitespace (2+ spaces)
-                String[] parts = line.split("\\s{2,}");
-
-                // Debug first few lines
-                if (lineNum <= 10) {
-                    System.out.println("[APP MANAGER] Line " + lineNum + " parts: " + parts.length + " -> " + java.util.Arrays.toString(parts));
+                // Skip header lines (Name, Id, MainWindowTitle, MemMB and separator line)
+                if (!headerSkipped) {
+                    if (line.startsWith("Name") || line.startsWith("----")) {
+                        continue;
+                    }
+                    headerSkipped = true;
                 }
 
-                if (parts.length >= 5) {
-                    String imageName = parts[0].trim();
-                    String pid = parts[1].trim();
-                    String sessionName = parts[2].trim();
-                    String memUsage = parts[4].trim();
-
-                    // CHI hien thi User Apps - chi lay processes chay trong Console session
-                    // Giong nhu Task Manager phan biet Apps vs Background processes
-                    if (!sessionName.equalsIgnoreCase("Console")) {
-                        continue;
-                    }
-
-                    // Skip system UI processes
-                    String lowerName = imageName.toLowerCase();
-                    if (lowerName.contains("dwm.exe") ||
-                        lowerName.contains("csrss.exe") ||
-                        lowerName.contains("winlogon.exe") ||
-                        lowerName.contains("fontdrvhost.exe") ||
-                        lowerName.contains("logonui.exe") ||
-                        lowerName.contains("sihost.exe") ||
-                        lowerName.contains("taskhostw.exe") ||
-                        lowerName.contains("ctfmon.exe") ||
-                        lowerName.contains("runtimebroker.exe") ||
-                        lowerName.contains("searchapp.exe") ||
-                        lowerName.contains("startmenuexperiencehost.exe") ||
-                        lowerName.contains("textinputhost.exe") ||
-                        lowerName.contains("shellexperiencehost.exe") ||
-                        lowerName.contains("securityhealthsystray.exe")) {
-                        continue;
-                    }
-
-                    // Only show each app once (many processes have duplicates)
-                    String baseName = imageName.toLowerCase();
-                    if (seenNames.contains(baseName)) {
-                        continue;
-                    }
-                    seenNames.add(baseName);
-
-                    // Format output
-                    String appInfo = String.format("%-35s PID: %-8s  Mem: %s",
-                                                   imageName, pid, memUsage);
-
-                    result.append(appInfo).append("\n");
-                    count++;
-
-                    if (count >= 50) break; // Limit
-                }
+                // Add valid app line
+                result.append(line).append("\n");
+                count++;
             }
 
             int exitCode = p.waitFor();
 
             if (count == 0) {
-                System.out.println("[APP MANAGER] No apps found, exit code: " + exitCode);
-                result.append("Khong tim thay ung dung nao.\n");
-                result.append("Luu y: Chi hien thi cac ung dung nguoi dung, khong hien thi system processes.\n");
+                System.out.println("[APP MANAGER] No GUI apps found, exit code: " + exitCode);
+                result.append("Khong tim thay ung dung nao co GUI.\n");
+                result.append("Luu y: Chi hien thi Apps (processes co MainWindowTitle), giong Task Manager.\n");
             } else {
                 result.append("\n").append("─────────────────────────────────────────\n");
-                result.append("Tong so: ").append(count).append(" ung dung dang chay");
+                result.append("Tong so: ").append(count).append(" ung dung");
             }
 
-            System.out.println("[APP MANAGER] Found " + count + " applications (exit code: " + exitCode + ")");
+            System.out.println("[APP MANAGER] Found " + count + " GUI applications (exit code: " + exitCode + ")");
             return result.toString();
 
         } catch (Exception e) {
