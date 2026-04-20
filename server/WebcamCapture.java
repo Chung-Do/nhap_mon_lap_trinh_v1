@@ -36,45 +36,57 @@ public class WebcamCapture {
 
     /**
      * LIST tat ca camera co san tren he thong (Windows)
+     * PRIMARY METHOD: PowerShell (nhanh va chinh xac)
+     * BACKUP METHOD: FFmpeg DirectShow (neu PowerShell fail)
      * @param out Output stream to client
      */
     public static void listCameras(DataOutputStream out) throws IOException {
         System.out.println("[CAMERA LIST] ========== LISTING CAMERAS ==========");
 
         try {
+            // PRIMARY: Thu PowerShell truoc (nhanh va chinh xac hon)
+            System.out.println("[CAMERA LIST] Using PowerShell as primary method...");
+            String psResult = listCamerasViaPowerShell();
+
+            if (psResult != null && !psResult.isEmpty()) {
+                System.out.println("[CAMERA LIST] ✓ PowerShell found cameras!");
+                out.writeUTF(JsonUtil.textResponse("OK",
+                    "=== DANH SACH CAMERA ===\n\n" + psResult +
+                    "\n\n💡 Chon camera va bam nut '▼' de dien vao"));
+                out.flush();
+                return; // SUCCESS
+            }
+
+            // BACKUP: Neu PowerShell fail, thu FFmpeg DirectShow
+            System.out.println("[CAMERA LIST] PowerShell failed, trying FFmpeg as backup...");
             String ffmpeg = getFFmpeg();
             System.out.println("[CAMERA LIST] FFmpeg path: " + ffmpeg);
 
-            // Windows: list devices
             ProcessBuilder pb = new ProcessBuilder(ffmpeg, "-list_devices", "true", "-f", "dshow", "-i", "dummy");
             pb.redirectErrorStream(true);
             Process p = pb.start();
 
-            // Doc output va tim tat ca camera
             BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
             String line;
             boolean foundVideoSection = false;
             StringBuilder cameraList = new StringBuilder();
-            StringBuilder fullOutput = new StringBuilder(); // Log full output
+            StringBuilder fullOutput = new StringBuilder();
             int count = 0;
 
             System.out.println("[CAMERA LIST] FFmpeg output:");
             while ((line = reader.readLine()) != null) {
-                System.out.println("[CAMERA LIST] " + line); // Log moi dong
+                System.out.println("[CAMERA LIST] " + line);
                 fullOutput.append(line).append("\n");
 
-                // Windows: Tim dong chua ten camera trong dau ""
                 if (line.contains("DirectShow video devices") || line.contains("video devices")) {
                     foundVideoSection = true;
                     System.out.println("[CAMERA LIST] >>> Found video devices section!");
                 }
                 if (foundVideoSection && line.contains("\"")) {
-                    // Extract ten camera tu dong nhu: [dshow @ ...] "Camera Name"
                     int start = line.indexOf("\"");
                     int end = line.indexOf("\"", start + 1);
                     if (start != -1 && end != -1) {
                         String cameraName = line.substring(start + 1, end);
-                        // Bo qua dong "Alternative name"
                         if (!line.contains("Alternative name") && !cameraName.startsWith("@")) {
                             count++;
                             cameraList.append(count).append(". ").append(cameraName).append("\n");
@@ -82,7 +94,6 @@ public class WebcamCapture {
                         }
                     }
                 }
-                // Dung khi het phan video devices
                 if (foundVideoSection && (line.contains("DirectShow audio devices") || line.contains("audio devices"))) {
                     System.out.println("[CAMERA LIST] >>> Reached audio devices section, stopping");
                     break;
@@ -93,40 +104,29 @@ public class WebcamCapture {
             System.out.println("[CAMERA LIST] FFmpeg exit code: " + p.exitValue());
 
             if (count == 0) {
-                System.out.println("[CAMERA LIST] No cameras found via FFmpeg");
+                System.out.println("[CAMERA LIST] ✗ FFmpeg also failed");
                 System.out.println("[CAMERA LIST] Full FFmpeg output:");
                 System.out.println(fullOutput.toString());
 
-                // BACKUP: Thu dung PowerShell de list camera
-                System.out.println("[CAMERA LIST] Trying PowerShell method as backup...");
-                String psResult = listCamerasViaPowerShell();
-                if (psResult != null && !psResult.isEmpty()) {
-                    System.out.println("[CAMERA LIST] PowerShell found cameras!");
-                    out.writeUTF(JsonUtil.textResponse("OK",
-                        "=== DANH SACH CAMERA (PowerShell) ===\n\n" + psResult +
-                        "\n\n💡 Luu y: Copy chinh xac ten camera vao o nhap"));
-                    out.flush();
-                } else {
-                    sendError(out,
-                        "⚠️  KHONG TIM THAY CAMERA\n\n" +
-                        "FFmpeg va PowerShell deu khong detect duoc camera.\n\n" +
-                        "Nguyen nhan co the:\n" +
-                        "1. Camera khong ho tro DirectShow\n" +
-                        "2. Driver camera chua cai dat dung\n" +
-                        "3. Camera dang duoc app khac su dung\n" +
-                        "4. Can chay server voi quyen Administrator\n\n" +
-                        "Thu lam:\n" +
-                        "• Mo 'Camera' app trong Windows de test\n" +
-                        "• Cap nhat driver camera\n" +
-                        "• Dong Zoom/Teams/Skype\n" +
-                        "• Chay server voi 'Run as Administrator'\n\n" +
-                        "Neu van loi, de TRONG o camera va thu chup truc tiep\n" +
-                        "(Server se thu dung fallback method)");
-                }
+                sendError(out,
+                    "⚠️  KHONG TIM THAY CAMERA\n\n" +
+                    "PowerShell va FFmpeg deu khong detect duoc camera.\n\n" +
+                    "Nguyen nhan co the:\n" +
+                    "1. Camera chua duoc cam vao\n" +
+                    "2. Driver camera chua cai dat dung\n" +
+                    "3. Camera dang duoc app khac su dung (Zoom/Teams)\n" +
+                    "4. Can chay server voi quyen Administrator\n\n" +
+                    "Thu lam:\n" +
+                    "• Mo 'Camera' app trong Windows de test camera\n" +
+                    "• Cap nhat driver trong Device Manager\n" +
+                    "• Dong Zoom/Teams/Skype\n" +
+                    "• Chay server voi 'Run as Administrator'\n\n" +
+                    "WORKAROUND: De TRONG o camera va bam 'Chup webcam'\n" +
+                    "(Server se thu auto-detect)");
             } else {
-                System.out.println("[CAMERA LIST] Total cameras found: " + count);
+                System.out.println("[CAMERA LIST] ✓ FFmpeg found " + count + " camera(s)");
                 out.writeUTF(JsonUtil.textResponse("OK",
-                    "=== DANH SACH CAMERA ===\n\n" + cameraList.toString() +
+                    "=== DANH SACH CAMERA (FFmpeg) ===\n\n" + cameraList.toString() +
                     "\n━━━━━━━━━━━━━━━━━━━━━━━━\nTong so: " + count + " camera\n\n" +
                     "💡 Chon camera va bam nut '▼' de dien vao"));
                 out.flush();
@@ -136,7 +136,7 @@ public class WebcamCapture {
             System.err.println("[CAMERA LIST] EXCEPTION: " + e.getMessage());
             e.printStackTrace();
             sendError(out, "Loi khi quet camera: " + e.getMessage() +
-                "\n\nThu de TRONG o camera va chup truc tiep.");
+                "\n\nWORKAROUND: De TRONG o camera va thu chup truc tiep.");
         }
     }
 
