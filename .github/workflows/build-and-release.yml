@@ -36,17 +36,13 @@ jobs:
         .\build_server.bat
       shell: cmd
 
+    - name: Install ImageMagick
+      run: choco install imagemagick -y
+      shell: cmd
+
     - name: Convert PNG to ICO for Launcher
-      run: |
-        # Convert server_256.png to server.ico
-        Add-Type -AssemblyName System.Drawing
-        $png = [System.Drawing.Image]::FromFile("$pwd\icons\server_256.png")
-        $ico = New-Object System.Drawing.Icon($png, 256, 256)
-        $stream = [System.IO.File]::Create("$pwd\icons\server.ico")
-        $ico.Save($stream)
-        $stream.Close()
-        $png.Dispose()
-      shell: powershell
+      run: magick convert icons\server_256.png -define icon:auto-resize=256,128,64,48,32,16 icons\server.ico
+      shell: cmd
 
     - name: Build Launcher EXE
       run: |
