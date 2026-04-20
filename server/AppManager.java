@@ -27,18 +27,8 @@ public class AppManager {
      * List running applications on Windows
      */
     private static String listAppsWindows() {
-        System.out.println("[APP MANAGER] Executing Windows tasklist...");
-
-        // Simple version: just run tasklist directly
-        String rawResult = JsonUtil.executeCommand("tasklist /FO TABLE");
-        System.out.println("[APP MANAGER] Raw tasklist output length: " + rawResult.length());
-
-        if (rawResult != null && !rawResult.trim().isEmpty()) {
-            return "=== RUNNING APPLICATIONS ===\n\n" + rawResult;
-        }
-
-        // Fallback to complex parsing
         try {
+            System.out.println("[APP MANAGER] Executing Windows tasklist...");
             // Use tasklist with TABLE format for better compatibility
             ProcessBuilder pb = new ProcessBuilder("tasklist", "/FO", "TABLE");
             pb.redirectErrorStream(true);
@@ -77,11 +67,31 @@ public class AppManager {
                 if (parts.length >= 5) {
                     String imageName = parts[0].trim();
                     String pid = parts[1].trim();
+                    String sessionName = parts[2].trim();
                     String memUsage = parts[4].trim();
 
-                    // Skip only critical system processes
-                    if (imageName.equalsIgnoreCase("System") ||
-                        imageName.equalsIgnoreCase("Registry")) {
+                    // CHI hien thi User Apps - chi lay processes chay trong Console session
+                    // Giong nhu Task Manager phan biet Apps vs Background processes
+                    if (!sessionName.equalsIgnoreCase("Console")) {
+                        continue;
+                    }
+
+                    // Skip system UI processes
+                    String lowerName = imageName.toLowerCase();
+                    if (lowerName.contains("dwm.exe") ||
+                        lowerName.contains("csrss.exe") ||
+                        lowerName.contains("winlogon.exe") ||
+                        lowerName.contains("fontdrvhost.exe") ||
+                        lowerName.contains("logonui.exe") ||
+                        lowerName.contains("sihost.exe") ||
+                        lowerName.contains("taskhostw.exe") ||
+                        lowerName.contains("ctfmon.exe") ||
+                        lowerName.contains("runtimebroker.exe") ||
+                        lowerName.contains("searchapp.exe") ||
+                        lowerName.contains("startmenuexperiencehost.exe") ||
+                        lowerName.contains("textinputhost.exe") ||
+                        lowerName.contains("shellexperiencehost.exe") ||
+                        lowerName.contains("securityhealthsystray.exe")) {
                         continue;
                     }
 
@@ -99,7 +109,7 @@ public class AppManager {
                     result.append(appInfo).append("\n");
                     count++;
 
-                    if (count >= 30) break; // Limit to 30 unique apps
+                    if (count >= 50) break; // Limit
                 }
             }
 
