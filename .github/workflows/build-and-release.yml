@@ -18,130 +18,63 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Setup GraalVM
-      uses: graalvm/setup-graalvm@v1
+    - name: Setup Java JDK
+      uses: actions/setup-java@v4
       with:
+        distribution: 'temurin'
         java-version: '21'
-        distribution: 'graalvm'
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        native-image-job-reports: 'true'
 
-    - name: Install Build Tools
+    - name: Build Client
       run: |
-        choco install imagemagick -y
-        npm install -g rcedit
+        echo "Building Client..."
+        .\build_client.bat
       shell: cmd
 
-    - name: Convert PNG to ICO
+    - name: Build Server
       run: |
-        magick convert icons\client_256.png -define icon:auto-resize=256,128,64,48,32,16 icons\client.ico
-        magick convert icons\server_256.png -define icon:auto-resize=256,128,64,48,32,16 icons\server.ico
+        echo "Building Server..."
+        .\build_server.bat
       shell: cmd
 
-    - name: Build Client Native
+    - name: Create Release Zip Files
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')
       run: |
-        if exist build\client rmdir /s /q build\client
-        mkdir build\client
-        copy client\*.java build\client\
-        javac -d build\client build\client\*.java
-        echo Main-Class: ClientGUI> build\client\MANIFEST.MF
-        cd build\client
-        jar cfm client.jar MANIFEST.MF *.class
+        cd dist\client
+        Compress-Archive -Path RemotePC-Client -DestinationPath ..\..\RemotePC-Client.zip
         cd ..\..
-        copy client\reflect-config.json build\client\
-        cd build\client
-        native-image -jar client.jar -H:Name=RemotePC-Client -H:ReflectionConfigurationFiles=reflect-config.json -H:+ReportExceptionStackTraces --no-fallback
-        cd ..\..
-        if not exist dist\client_native mkdir dist\client_native
-        move build\client\RemotePC-Client.exe dist\client_native\
-        rcedit dist\client_native\RemotePC-Client.exe --set-icon icons\client.ico
-      shell: cmd
-
-    - name: Build Server Native
-      run: |
-        if exist build\server rmdir /s /q build\server
-        mkdir build\server
-        copy server\*.java build\server\
-        javac -d build\server build\server\*.java
-        echo Main-Class: Server> build\server\MANIFEST.MF
-        cd build\server
-        jar cfm server.jar MANIFEST.MF *.class
-        cd ..\..
-        copy server\reflect-config.json build\server\
-        cd build\server
-        native-image -jar server.jar -H:Name=RemotePC-Server -H:ReflectionConfigurationFiles=reflect-config.json -H:+ReportExceptionStackTraces --no-fallback
-        cd ..\..
-        if not exist dist\server_native mkdir dist\server_native
-        move build\server\RemotePC-Server.exe dist\server_native\
-        rcedit dist\server_native\RemotePC-Server.exe --set-icon icons\server.ico
-      shell: cmd
-
-    - name: Build Launcher Native
-      run: |
-        if exist build\launcher rmdir /s /q build\launcher
-        mkdir build\launcher
-        copy launcher\*.java build\launcher\
-        javac -d build\launcher build\launcher\*.java
-        echo Main-Class: ServerLauncher> build\launcher\MANIFEST.MF
-        cd build\launcher
-        jar cfm launcher.jar MANIFEST.MF *.class
-        native-image -jar launcher.jar -H:Name=RemotePC-Server-Installer -H:+ReportExceptionStackTraces --no-fallback
-        cd ..\..
-        if not exist dist\launcher mkdir dist\launcher
-        move build\launcher\RemotePC-Server-Installer.exe dist\launcher\
-        rcedit dist\launcher\RemotePC-Server-Installer.exe --set-icon icons\server.ico
-      shell: cmd
+        cd dist\server
+        Compress-Archive -Path RemotePC-Server -DestinationPath ..\..\RemotePC-Server.zip
+      shell: powershell
 
     - name: Upload Client Artifact
       uses: actions/upload-artifact@v4
       with:
         name: RemotePC-Client
-        path: dist/client_native/RemotePC-Client.exe
+        path: dist/client/RemotePC-Client
         retention-days: 30
 
     - name: Upload Server Artifact
       uses: actions/upload-artifact@v4
       with:
         name: RemotePC-Server
-        path: dist/server_native/RemotePC-Server.exe
+        path: dist/server/RemotePC-Server
         retention-days: 30
-
-    - name: Upload Launcher Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: RemotePC-Server-Installer
-        path: dist/launcher/RemotePC-Server-Installer.exe
-        retention-days: 30
-
-    - name: Prepare Release Files
-      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')
-      run: |
-        copy dist\client_native\RemotePC-Client.exe RemotePC-Client.exe
-        copy dist\server_native\RemotePC-Server.exe RemotePC-Server.exe
-        copy dist\launcher\RemotePC-Server-Installer.exe RemotePC-Server-Installer.exe
-      shell: cmd
 
     - name: Update Latest Release
       if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
       uses: softprops/action-gh-release@v1
       with:
         tag_name: latest
-        name: Latest Build (Native - No JRE Required)
+        name: Latest Build
         body: |
-          🚀 **Native Build** - Tự động build từ commit ${{ github.sha }}
-
-          **All executables are standalone - No Java required!**
+          Tự động build từ commit ${{ github.sha }}
 
           **Download:**
-          - **RemotePC-Client.exe**: Client application (~20-30MB)
-          - **RemotePC-Server.exe**: Server application (~20-30MB)
-          - **RemotePC-Server-Installer.exe**: One-click installer (~15MB)
-            - Auto-downloads latest server from GitHub
-            - Extracts and runs automatically
+          - RemotePC-Client.zip: Client application (requires JRE 14+)
+          - RemotePC-Server.zip: Server application (requires JRE 14+)
         files: |
-          RemotePC-Client.exe
-          RemotePC-Server.exe
-          RemotePC-Server-Installer.exe
+          RemotePC-Client.zip
+          RemotePC-Server.zip
         prerelease: false
         draft: false
       env:
@@ -152,8 +85,7 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          RemotePC-Client.exe
-          RemotePC-Server.exe
-          RemotePC-Server-Installer.exe
+          RemotePC-Client.zip
+          RemotePC-Server.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
