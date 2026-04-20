@@ -36,6 +36,24 @@ jobs:
         .\build_server.bat
       shell: cmd
 
+    - name: Convert PNG to ICO for Launcher
+      run: |
+        # Convert server_256.png to server.ico
+        Add-Type -AssemblyName System.Drawing
+        $png = [System.Drawing.Image]::FromFile("$pwd\icons\server_256.png")
+        $ico = New-Object System.Drawing.Icon($png, 256, 256)
+        $stream = [System.IO.File]::Create("$pwd\icons\server.ico")
+        $ico.Save($stream)
+        $stream.Close()
+        $png.Dispose()
+      shell: powershell
+
+    - name: Build Launcher EXE
+      run: |
+        echo "Building Launcher..."
+        .\build_launcher.bat
+      shell: cmd
+
     - name: Create Zip Files
       run: |
         cd dist\client
@@ -43,6 +61,9 @@ jobs:
         cd ..\..
         cd dist\server
         Compress-Archive -Path RemotePC-Server -DestinationPath ..\..\RemotePC-Server.zip
+        cd ..\..
+        cd dist\launcher
+        Compress-Archive -Path RemotePC-Server-Installer -DestinationPath ..\..\RemotePC-Server-Installer.zip
       shell: powershell
 
     - name: Upload Client Artifact
@@ -59,6 +80,13 @@ jobs:
         path: RemotePC-Server.zip
         retention-days: 30
 
+    - name: Upload Launcher Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: RemotePC-Server-Installer
+        path: RemotePC-Server-Installer.zip
+        retention-days: 30
+
     - name: Update Latest Release
       if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
       uses: softprops/action-gh-release@v1
@@ -71,9 +99,11 @@ jobs:
           **Download:**
           - RemotePC-Client.zip: Client application
           - RemotePC-Server.zip: Server application
+          - RemotePC-Server-Installer.zip: One-click installer (auto-download & run server)
         files: |
           RemotePC-Client.zip
           RemotePC-Server.zip
+          RemotePC-Server-Installer.zip
         prerelease: false
         draft: false
       env:
@@ -86,5 +116,6 @@ jobs:
         files: |
           RemotePC-Client.zip
           RemotePC-Server.zip
+          RemotePC-Server-Installer.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
