@@ -3,13 +3,11 @@ import java.net.URL;
 import java.nio.file.*;
 
 /**
- * FFmpeg Manager - Tu dong download va quan ly ffmpeg
+ * FFmpeg Manager - Tu dong download va quan ly ffmpeg (Windows Only)
  *
  * App se tu dong download ffmpeg lan dau tien chay, khong can user cai gi!
  *
  * Windows: Download ffmpeg.exe (essentials build ~70MB)
- * macOS: Huong dan cai qua Homebrew (1 dong lenh)
- * Linux: Huong dan cai qua apt/dnf (1 dong lenh)
  */
 public class FFmpegManager {
 
@@ -75,18 +73,11 @@ public class FFmpegManager {
     }
 
     /**
-     * Setup ffmpeg tu dong
+     * Setup ffmpeg tu dong (Windows only)
      */
     private static void setupFFmpeg(File bundleDir, File ffmpegFile) throws Exception {
         bundleDir.mkdirs();
-
-        if (isWindows()) {
-            setupFFmpegWindows(ffmpegFile);
-        } else if (isMac()) {
-            setupFFmpegMac();
-        } else {
-            setupFFmpegLinux();
-        }
+        setupFFmpegWindows(ffmpegFile);
     }
 
     /**
@@ -176,45 +167,6 @@ public class FFmpegManager {
     /**
      * macOS: Huong dan cai qua Homebrew
      */
-    private static void setupFFmpegMac() {
-        System.out.println("╔══════════════════════════════════════════════════════╗");
-        System.out.println("║  macOS: Can cai ffmpeg                               ║");
-        System.out.println("╚══════════════════════════════════════════════════════╝");
-        System.out.println("");
-        System.out.println("Chay lenh sau trong Terminal:");
-        System.out.println("");
-        System.out.println("    brew install ffmpeg");
-        System.out.println("");
-        System.out.println("Neu chua co Homebrew, cai bang:");
-        System.out.println("");
-        System.out.println("    /bin/bash -c \"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\"");
-        System.out.println("");
-        System.out.println("Sau khi cai xong, khoi dong lai server.");
-        System.out.println("");
-    }
-
-    /**
-     * Linux: Huong dan cai qua package manager
-     */
-    private static void setupFFmpegLinux() {
-        System.out.println("╔══════════════════════════════════════════════════════╗");
-        System.out.println("║  Linux: Can cai ffmpeg                               ║");
-        System.out.println("╚══════════════════════════════════════════════════════╝");
-        System.out.println("");
-        System.out.println("Chay lenh sau tuy theo distro:");
-        System.out.println("");
-        System.out.println("Ubuntu/Debian:");
-        System.out.println("    sudo apt update && sudo apt install ffmpeg");
-        System.out.println("");
-        System.out.println("Fedora/CentOS:");
-        System.out.println("    sudo dnf install ffmpeg");
-        System.out.println("");
-        System.out.println("Arch Linux:");
-        System.out.println("    sudo pacman -S ffmpeg");
-        System.out.println("");
-        System.out.println("Sau khi cai xong, khoi dong lai server.");
-        System.out.println("");
-    }
 
     /**
      * Download file tu URL voi progress bar
@@ -358,11 +310,7 @@ public class FFmpegManager {
     // ── Helper methods ──────────────────────────────────────────────────────
 
     private static boolean isWindows() {
-        return System.getProperty("os.name").toLowerCase().contains("win");
-    }
-
-    private static boolean isMac() {
-        return System.getProperty("os.name").toLowerCase().contains("mac");
+        return true; // Windows only
     }
 
     /**

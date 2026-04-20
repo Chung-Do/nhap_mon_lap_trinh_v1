@@ -17,9 +17,6 @@ import java.util.*;
  */
 public class NetworkDiag {
 
-    private static final boolean IS_WIN =
-        System.getProperty("os.name").toLowerCase().contains("win");
-
     // ════════════════════════════════════════════
     //  1. NETWORK INFO
     // ════════════════════════════════════════════
@@ -76,32 +73,26 @@ public class NetworkDiag {
             sb.append("Loi lay interface: ").append(e.getMessage()).append("\n\n");
         }
 
-        // Default Gateway
+        // Default Gateway (Windows)
         sb.append("=== DEFAULT GATEWAY ===\n");
         try {
-            if (IS_WIN) {
-                // route PRINT 0.0.0.0 chi hien route co destination 0.0.0.0 (default)
-                String routeOut = JsonUtil.executeCommand("route PRINT 0.0.0.0");
-                boolean found = false;
-                for (String line : routeOut.split("\n")) {
-                    String t = line.trim();
-                    // Tim dong co dang: "0.0.0.0   0.0.0.0   <gateway>  <interface>  <metric>"
-                    if (t.startsWith("0.0.0.0") && t.split("\\s+").length >= 4) {
-                        String[] cols = t.split("\\s+");
-                        if (cols.length >= 3) {
-                            sb.append("  Gateway : ").append(cols[2]).append("\n");
-                            if (cols.length >= 4)
-                                sb.append("  Via iface: ").append(cols[3]).append("\n");
-                            found = true;
-                        }
+            // route PRINT 0.0.0.0 chi hien route co destination 0.0.0.0 (default)
+            String routeOut = JsonUtil.executeCommand("route PRINT 0.0.0.0");
+            boolean found = false;
+            for (String line : routeOut.split("\n")) {
+                String t = line.trim();
+                // Tim dong co dang: "0.0.0.0   0.0.0.0   <gateway>  <interface>  <metric>"
+                if (t.startsWith("0.0.0.0") && t.split("\\s+").length >= 4) {
+                    String[] cols = t.split("\\s+");
+                    if (cols.length >= 3) {
+                        sb.append("  Gateway : ").append(cols[2]).append("\n");
+                        if (cols.length >= 4)
+                            sb.append("  Via iface: ").append(cols[3]).append("\n");
+                        found = true;
                     }
                 }
-                if (!found) sb.append("  (Khong tim thay default gateway)\n");
-            } else {
-                String gw = JsonUtil.executeCommand("ip route show default");
-                sb.append(gw.trim().isEmpty() ? "  (Khong co)" : gw);
-                sb.append("\n");
             }
+            if (!found) sb.append("  (Khong tim thay default gateway)\n");
         } catch (Exception e) {
             sb.append("  Loi doc gateway: ").append(e.getMessage()).append("\n");
         }

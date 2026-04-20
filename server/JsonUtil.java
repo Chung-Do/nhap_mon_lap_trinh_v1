@@ -33,11 +33,7 @@ public class JsonUtil {
 
     public static String executeCommand(String command) {
         try {
-            ProcessBuilder pb;
-            if (System.getProperty("os.name").toLowerCase().contains("win"))
-                pb = new ProcessBuilder("cmd", "/c", command);
-            else
-                pb = new ProcessBuilder("sh", "-c", command);
+            ProcessBuilder pb = new ProcessBuilder("cmd", "/c", command);
             pb.redirectErrorStream(true);
             Process p = pb.start();
             BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()));

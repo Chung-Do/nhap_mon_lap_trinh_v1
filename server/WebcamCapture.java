@@ -4,10 +4,9 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 
 /**
- * Function 7: Webcam Capture & Video Recording
+ * Function 7: Webcam Capture & Video Recording (Windows Only)
  *
  * Su dung ffmpeg de chup anh va record video tu webcam.
- * Can cai ffmpeg: https://ffmpeg.org/download.html
  *
  * Flow:
  *  1. Bam "Record" → Bat dau record video tu camera (background)
@@ -47,33 +46,12 @@ public class WebcamCapture {
         }
 
         System.out.println("[CAMERA DETECT] ========== AUTO-DETECTING CAMERA ==========");
-        boolean isWin = System.getProperty("os.name").toLowerCase().contains("win");
-        boolean isMac = System.getProperty("os.name").toLowerCase().contains("mac");
 
         try {
             String ffmpeg = getFFmpeg();
-            ProcessBuilder pb;
-
-            if (isWin) {
-                // Windows: list devices
-                System.out.println("[CAMERA DETECT] Scanning Windows cameras...");
-                pb = new ProcessBuilder(ffmpeg, "-list_devices", "true", "-f", "dshow", "-i", "dummy");
-            } else if (isMac) {
-                // macOS: list devices
-                System.out.println("[CAMERA DETECT] Scanning macOS cameras...");
-                pb = new ProcessBuilder(ffmpeg, "-f", "avfoundation", "-list_devices", "true", "-i", "");
-            } else {
-                // Linux: check /dev/video0
-                System.out.println("[CAMERA DETECT] Checking Linux camera at /dev/video0...");
-                File videoDevice = new File("/dev/video0");
-                if (videoDevice.exists()) {
-                    detectedCamera = "/dev/video0";
-                    System.out.println("[CAMERA DETECT] ✓ Found: " + detectedCamera);
-                    return detectedCamera;
-                }
-                System.out.println("[CAMERA DETECT] ✗ No camera found at /dev/video0");
-                return null;
-            }
+            // Windows: list devices
+            System.out.println("[CAMERA DETECT] Scanning Windows cameras...");
+            ProcessBuilder pb = new ProcessBuilder(ffmpeg, "-list_devices", "true", "-f", "dshow", "-i", "dummy");
 
             pb.redirectErrorStream(true);
             Process p = pb.start();
@@ -87,36 +65,18 @@ public class WebcamCapture {
                 System.out.println("[CAMERA DETECT] " + line);
 
                 // Windows: Tim dong chua ten camera trong dau ""
-                if (isWin) {
-                    if (line.contains("DirectShow video devices") || line.contains("dshow")) {
-                        foundVideoSection = true;
-                    }
-                    if (foundVideoSection && line.contains("\"")) {
-                        // Extract ten camera tu dong nhu: [dshow @ ...] "Camera Name"
-                        int start = line.indexOf("\"");
-                        int end = line.indexOf("\"", start + 1);
-                        if (start != -1 && end != -1) {
-                            detectedCamera = line.substring(start + 1, end);
-                            System.out.println("[CAMERA DETECT] ✓ Found Windows camera: " + detectedCamera);
-                            p.destroy();
-                            return detectedCamera;
-                        }
-                    }
+                if (line.contains("DirectShow video devices") || line.contains("dshow")) {
+                    foundVideoSection = true;
                 }
-
-                // macOS: Tim camera index (thuong la 0)
-                if (isMac) {
-                    if (line.contains("AVFoundation video devices")) {
-                        foundVideoSection = true;
-                    }
-                    if (foundVideoSection && line.matches(".*\\[\\d+\\].*")) {
-                        // Extract index tu dong nhu: [AVFoundation indev @ ...] [0] FaceTime HD Camera
-                        if (line.contains("[0]")) {
-                            detectedCamera = "0";  // macOS dung index
-                            System.out.println("[CAMERA DETECT] ✓ Found macOS camera at index: 0");
-                            p.destroy();
-                            return detectedCamera;
-                        }
+                if (foundVideoSection && line.contains("\"")) {
+                    // Extract ten camera tu dong nhu: [dshow @ ...] "Camera Name"
+                    int start = line.indexOf("\"");
+                    int end = line.indexOf("\"", start + 1);
+                    if (start != -1 && end != -1) {
+                        detectedCamera = line.substring(start + 1, end);
+                        System.out.println("[CAMERA DETECT] ✓ Found Windows camera: " + detectedCamera);
+                        p.destroy();
+                        return detectedCamera;
                     }
                 }
             }
@@ -149,11 +109,9 @@ public class WebcamCapture {
      */
     public static void capture(DataOutputStream out, String cameraName, String quality) throws IOException {
         String tmpFile = System.getProperty("java.io.tmpdir") + File.separator + "webcam_snap.jpg";
-        boolean isWin  = System.getProperty("os.name").toLowerCase().contains("win");
-        boolean isMac  = System.getProperty("os.name").toLowerCase().contains("mac");
 
         System.out.println("[WEBCAM DEBUG] ========== WEBCAM CAPTURE START ==========");
-        System.out.println("[WEBCAM DEBUG] OS: " + System.getProperty("os.name"));
+        System.out.println("[WEBCAM DEBUG] OS: Windows");
         System.out.println("[WEBCAM DEBUG] Camera (from client): " + (cameraName == null || cameraName.trim().isEmpty() ? "(empty)" : cameraName));
         System.out.println("[WEBCAM DEBUG] Temp file: " + tmpFile);
 
@@ -168,7 +126,7 @@ public class WebcamCapture {
 
                 if (cameraName == null) {
                     // Neu khong detect duoc thi fallback
-                    cameraName = isWin ? "Integrated Camera" : (isMac ? "0" : "/dev/video0");
+                    cameraName = "Integrated Camera";
                     System.out.println("[WEBCAM DEBUG] ⚠ Auto-detect failed, using fallback: " + cameraName);
                 } else {
                     System.out.println("[WEBCAM DEBUG] ✓ Auto-detected camera: " + cameraName);
@@ -199,50 +157,19 @@ public class WebcamCapture {
                     break;
             }
 
-            ProcessBuilder pb;
-            String[] command;
-            if (isWin) {
-                // Windows: dung dshow with optimization
-                command = new String[]{
-                    ffmpeg,
-                    "-f", "dshow",
-                    "-video_size", resolution,
-                    "-rtbufsize", "100M",  // Buffer size
-                    "-i", "video=" + cameraName,
-                    "-frames:v", "1",
-                    "-q:v", jpegQuality,  // JPEG quality (1-31, lower = better)
-                    "-pix_fmt", "yuvj420p",  // Fast pixel format
-                    "-y", tmpFile
-                };
-                pb = new ProcessBuilder(command);
-            } else if (isMac) {
-                // macOS: dung avfoundation with optimization
-                command = new String[]{
-                    ffmpeg,
-                    "-f", "avfoundation",
-                    "-video_size", resolution,
-                    "-framerate", "30",
-                    "-i", cameraName,
-                    "-frames:v", "1",
-                    "-q:v", jpegQuality,
-                    "-pix_fmt", "yuvj420p",
-                    "-y", tmpFile
-                };
-                pb = new ProcessBuilder(command);
-            } else {
-                // Linux: dung v4l2 with optimization
-                command = new String[]{
-                    ffmpeg,
-                    "-f", "v4l2",
-                    "-video_size", resolution,
-                    "-i", cameraName,
-                    "-frames:v", "1",
-                    "-q:v", jpegQuality,
-                    "-pix_fmt", "yuvj420p",
-                    "-y", tmpFile
-                };
-                pb = new ProcessBuilder(command);
-            }
+            // Windows: dung dshow with optimization
+            String[] command = new String[]{
+                ffmpeg,
+                "-f", "dshow",
+                "-video_size", resolution,
+                "-rtbufsize", "100M",  // Buffer size
+                "-i", "video=" + cameraName,
+                "-frames:v", "1",
+                "-q:v", jpegQuality,  // JPEG quality (1-31, lower = better)
+                "-pix_fmt", "yuvj420p",  // Fast pixel format
+                "-y", tmpFile
+            };
+            ProcessBuilder pb = new ProcessBuilder(command);
 
             System.out.println("[WEBCAM DEBUG] Command: " + String.join(" ", command));
             pb.redirectErrorStream(true);
@@ -304,9 +231,7 @@ public class WebcamCapture {
             return;
         }
 
-        boolean isWin = System.getProperty("os.name").toLowerCase().contains("win");
-        boolean isMac = System.getProperty("os.name").toLowerCase().contains("mac");
-        System.out.println("[WEBCAM DEBUG] OS: " + System.getProperty("os.name"));
+        System.out.println("[WEBCAM DEBUG] OS: Windows");
         System.out.println("[WEBCAM DEBUG] Camera (from client): " + (cameraName == null || cameraName.trim().isEmpty() ? "(empty)" : cameraName));
 
         try {
@@ -320,7 +245,7 @@ public class WebcamCapture {
 
                 if (cameraName == null) {
                     // Neu khong detect duoc thi fallback
-                    cameraName = isWin ? "Integrated Camera" : (isMac ? "0" : "/dev/video0");
+                    cameraName = "Integrated Camera";
                     System.out.println("[WEBCAM DEBUG] ⚠ Auto-detect failed, using fallback: " + cameraName);
                 } else {
                     System.out.println("[WEBCAM DEBUG] ✓ Auto-detected camera: " + cameraName);
@@ -335,53 +260,19 @@ public class WebcamCapture {
                              + "webcam_video_" + timestamp + ".mp4";
             System.out.println("[WEBCAM DEBUG] Output video: " + currentVideoFile);
 
-            ProcessBuilder pb;
-            String[] command;
-            if (isWin) {
-                // Windows: record from auto-detected or specified camera
-                // List cameras: ffmpeg -list_devices true -f dshow -i dummy
-                command = new String[] {
-                    ffmpeg,
-                    "-f", "dshow",
-                    "-i", "video=" + cameraName,
-                    "-framerate", "30",
-                    "-video_size", "1280x720",
-                    "-c:v", "libx264",
-                    "-preset", "ultrafast",
-                    "-y",
-                    currentVideoFile
-                };
-                pb = new ProcessBuilder(command);
-            } else if (isMac) {
-                // macOS: record from auto-detected or specified camera
-                // List devices: ffmpeg -f avfoundation -list_devices true -i ""
-                command = new String[] {
-                    ffmpeg,
-                    "-f", "avfoundation",
-                    "-framerate", "30",
-                    "-video_size", "1280x720",
-                    "-i", cameraName,  // Use detected camera index
-                    "-c:v", "libx264",
-                    "-preset", "ultrafast",
-                    "-y",
-                    currentVideoFile
-                };
-                pb = new ProcessBuilder(command);
-            } else {
-                // Linux: record from auto-detected or specified camera
-                command = new String[] {
-                    ffmpeg,
-                    "-f", "v4l2",
-                    "-framerate", "30",
-                    "-video_size", "1280x720",
-                    "-i", cameraName,  // Use detected device path
-                    "-c:v", "libx264",
-                    "-preset", "ultrafast",
-                    "-y",
-                    currentVideoFile
-                };
-                pb = new ProcessBuilder(command);
-            }
+            // Windows: record from auto-detected or specified camera
+            String[] command = new String[] {
+                ffmpeg,
+                "-f", "dshow",
+                "-i", "video=" + cameraName,
+                "-framerate", "30",
+                "-video_size", "1280x720",
+                "-c:v", "libx264",
+                "-preset", "ultrafast",
+                "-y",
+                currentVideoFile
+            };
+            ProcessBuilder pb = new ProcessBuilder(command);
 
             System.out.println("[WEBCAM DEBUG] Command: " + String.join(" ", command));
 

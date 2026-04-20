@@ -1,20 +1,13 @@
 import java.io.*;
 
-/** Function 2: List / Start / Kill Processes */
+/** Function 2: List / Start / Kill Processes (Windows Only) */
 public class ProcessManager {
 
-    private static final boolean IS_WIN =
-        System.getProperty("os.name").toLowerCase().contains("win");
-
     public static void listProcesses(DataOutputStream out) throws IOException {
-        String result;
-        if (IS_WIN) {
-            // TABLE /NH: khong dung CSV (CSV co nhieu dau ngoac kep lam loi JSON escaping)
-            // /NH = no header line
-            result = JsonUtil.executeCommand("tasklist /FO TABLE /NH");
-        } else {
-            result = JsonUtil.executeCommand("ps -eo pid,pcpu,pmem,comm --sort=-%cpu | head -80");
-        }
+        // TABLE /NH: khong dung CSV (CSV co nhieu dau ngoac kep lam loi JSON escaping)
+        // /NH = no header line
+        String result = JsonUtil.executeCommand("tasklist /FO TABLE /NH");
+
         if (result == null || result.trim().isEmpty())
             result = "(Khong co ket qua)";
 
@@ -37,9 +30,7 @@ public class ProcessManager {
     }
 
     public static void killProcess(DataOutputStream out, String pid) throws IOException {
-        String result = IS_WIN
-            ? JsonUtil.executeCommand("taskkill /PID " + pid + " /F")
-            : JsonUtil.executeCommand("kill -9 " + pid);
+        String result = JsonUtil.executeCommand("taskkill /PID " + pid + " /F");
         result = result.trim().isEmpty()
             ? "Da ket thuc tien trinh PID=" + pid
             : result;

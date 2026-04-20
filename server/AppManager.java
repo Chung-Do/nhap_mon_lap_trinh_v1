@@ -1,42 +1,44 @@
 import java.io.*;
 import java.util.*;
 
-/** Function 1: List / Start / Stop Applications */
+/** Function 1: List / Start / Stop Applications (Windows Only) */
 public class AppManager {
-
-    private static final boolean IS_WIN = System.getProperty("os.name").toLowerCase().contains("win");
-    private static final boolean IS_MAC = System.getProperty("os.name").toLowerCase().contains("mac");
 
     public static void listApps(DataOutputStream out) throws IOException {
         System.out.println("[APP MANAGER] Listing applications...");
 
-        String result;
-        if (IS_WIN) {
-            // Windows: List running applications
-            result = listAppsWindows();
-        } else if (IS_MAC) {
-            // macOS: List running applications
-            result = listAppsMac();
-        } else {
-            // Linux: List processes
-            result = JsonUtil.executeCommand("ps -eo pid,comm,%cpu,%mem --sort=-%cpu | head -50");
-        }
+        try {
+            String result = listAppsWindows();
 
-        System.out.println("[APP MANAGER] Result length: " + result.length());
-        if (result.length() < 100) {
-            System.out.println("[APP MANAGER] Result: " + result);
-        }
+            System.out.println("[APP MANAGER] Result length: " + result.length());
+            if (result.length() < 100) {
+                System.out.println("[APP MANAGER] Result: " + result);
+            }
 
-        send(out, "OK", result.isEmpty() ? "(Khong co ung dung)" : result);
+            send(out, "OK", result.isEmpty() ? "(Khong co ung dung)" : result);
+        } catch (Exception e) {
+            System.err.println("[APP MANAGER] Exception: " + e.getMessage());
+            e.printStackTrace();
+            send(out, "ERROR", "Exception: " + e.getMessage());
+        }
     }
 
     /**
      * List running applications on Windows
      */
     private static String listAppsWindows() {
-        try {
-            System.out.println("[APP MANAGER] Executing Windows tasklist...");
+        System.out.println("[APP MANAGER] Executing Windows tasklist...");
 
+        // Simple version: just run tasklist directly
+        String rawResult = JsonUtil.executeCommand("tasklist /FO TABLE");
+        System.out.println("[APP MANAGER] Raw tasklist output length: " + rawResult.length());
+
+        if (rawResult != null && !rawResult.trim().isEmpty()) {
+            return "=== RUNNING APPLICATIONS ===\n\n" + rawResult;
+        }
+
+        // Fallback to complex parsing
+        try {
             // Use tasklist with TABLE format for better compatibility
             ProcessBuilder pb = new ProcessBuilder("tasklist", "/FO", "TABLE");
             pb.redirectErrorStream(true);
@@ -124,70 +126,24 @@ public class AppManager {
         }
     }
 
-    /**
-     * List running applications on macOS
-     */
-    private static String listAppsMac() {
-        try {
-            System.out.println("[APP MANAGER] Executing macOS ps...");
-
-            ProcessBuilder pb = new ProcessBuilder("ps", "-eo", "pid,comm,%cpu,%mem", "--sort=-%cpu");
-            pb.redirectErrorStream(true);
-            Process p = pb.start();
-
-            BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
-            StringBuilder result = new StringBuilder();
-            result.append("=== RUNNING APPLICATIONS ===\n\n");
-
-            String line;
-            int count = 0;
-
-            // Skip header
-            reader.readLine();
-
-            while ((line = reader.readLine()) != null && count < 50) {
-                line = line.trim();
-                if (!line.isEmpty()) {
-                    result.append(line).append("\n");
-                    count++;
-                }
-            }
-
-            p.waitFor();
-
-            result.append("\n").append("Total: ").append(count).append(" processes");
-
-            System.out.println("[APP MANAGER] Found " + count + " processes");
-            return result.toString();
-
-        } catch (Exception e) {
-            System.err.println("[APP MANAGER] Error listing macOS apps: " + e.getMessage());
-            e.printStackTrace();
-            return "Error: " + e.getMessage();
-        }
-    }
 
     public static void startApp(DataOutputStream out, String appName) throws IOException {
         try {
             System.out.println("[APP MANAGER] Starting app: " + appName);
 
             ProcessBuilder pb;
-            if (IS_WIN) {
-                // Windows: Try multiple methods
-                // Method 1: Direct execution
-                if (appName.toLowerCase().endsWith(".exe")) {
-                    pb = new ProcessBuilder("cmd", "/c", "start", "", appName);
-                }
-                // Method 2: Search in PATH and common locations
-                else if (!appName.contains("\\") && !appName.contains("/")) {
-                    // Try to find in PATH
-                    pb = new ProcessBuilder("cmd", "/c", "start", "", appName + ".exe");
-                } else {
-                    // Full path provided
-                    pb = new ProcessBuilder("cmd", "/c", "start", "", appName);
-                }
+            // Windows: Try multiple methods
+            // Method 1: Direct execution
+            if (appName.toLowerCase().endsWith(".exe")) {
+                pb = new ProcessBuilder("cmd", "/c", "start", "", appName);
+            }
+            // Method 2: Search in PATH and common locations
+            else if (!appName.contains("\\") && !appName.contains("/")) {
+                // Try to find in PATH
+                pb = new ProcessBuilder("cmd", "/c", "start", "", appName + ".exe");
             } else {
-                pb = new ProcessBuilder("sh", "-c", appName + " &");
+                // Full path provided
+                pb = new ProcessBuilder("cmd", "/c", "start", "", appName);
             }
 
             pb.redirectErrorStream(true);
@@ -226,14 +182,12 @@ public class AppManager {
         try {
             System.out.println("[APP MANAGER] Stopping app: " + appName);
 
-            // Make sure .exe extension is present for Windows
-            if (IS_WIN && !appName.toLowerCase().endsWith(".exe")) {
+            // Make sure .exe extension is present
+            if (!appName.toLowerCase().endsWith(".exe")) {
                 appName = appName + ".exe";
             }
 
-            String result = IS_WIN
-                ? JsonUtil.executeCommand("taskkill /IM " + appName + " /F")
-                : JsonUtil.executeCommand("pkill -f " + appName);
+            String result = JsonUtil.executeCommand("taskkill /IM " + appName + " /F");
 
             // Check if successful
             if (result.toLowerCase().contains("success") || result.toLowerCase().contains("terminated")) {
