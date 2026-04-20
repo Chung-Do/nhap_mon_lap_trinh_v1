@@ -31,10 +31,10 @@ public class AppManager {
             System.out.println("[APP MANAGER] Using PowerShell to get Apps with GUI (MainWindowTitle)...");
 
             // PowerShell: Get processes with MainWindowTitle (= Apps in Task Manager)
-            // Only processes with visible main window are shown in "Apps" section
+            // Use CSV format for accurate parsing
             String psCommand = "Get-Process | Where-Object {$_.MainWindowTitle -ne ''} | " +
-                             "Select-Object Name, Id, MainWindowTitle, @{N='MemMB';E={[int]($_.WS/1MB)}} | " +
-                             "Format-Table -AutoSize | Out-String -Width 300";
+                             "Select-Object ProcessName, Id, MainWindowTitle, @{N='MemMB';E={[int]($_.WS/1MB)}} | " +
+                             "ConvertTo-Csv -NoTypeInformation";
 
             ProcessBuilder pb = new ProcessBuilder("powershell", "-Command", psCommand);
             pb.redirectErrorStream(true);
@@ -43,37 +43,59 @@ public class AppManager {
             BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream(), "UTF-8"));
 
             StringBuilder result = new StringBuilder();
-            result.append("=== RUNNING APPLICATIONS (Apps with GUI) ===\n\n");
+            result.append("=== RUNNING APPLICATIONS (Apps) ===\n\n");
 
             String line;
             int count = 0;
             boolean headerSkipped = false;
 
+            // Filter out Windows system UI apps
+            Set<String> systemApps = new HashSet<>(Arrays.asList(
+                "textinputhost", "searchapp", "startmenuexperiencehost",
+                "shellexperiencehost", "runtimebroker", "applicationframehost",
+                "windowsinternal.composableshell.experiences.textinput.inputapp"
+            ));
+
             while ((line = reader.readLine()) != null) {
                 line = line.trim();
-
-                // Skip empty lines
                 if (line.isEmpty()) continue;
 
-                // Skip header lines (Name, Id, MainWindowTitle, MemMB and separator line)
+                // Skip CSV header
                 if (!headerSkipped) {
-                    if (line.startsWith("Name") || line.startsWith("----")) {
+                    if (line.startsWith("\"ProcessName\"") || line.startsWith("ProcessName")) {
+                        headerSkipped = true;
                         continue;
                     }
-                    headerSkipped = true;
                 }
 
-                // Add valid app line
-                result.append(line).append("\n");
-                count++;
+                // Parse CSV line: "ProcessName","Id","MainWindowTitle","MemMB"
+                String[] parts = line.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)"); // Split CSV respecting quotes
+                if (parts.length >= 4) {
+                    String processName = parts[0].replace("\"", "").trim();
+                    String pid = parts[1].replace("\"", "").trim();
+                    String windowTitle = parts[2].replace("\"", "").trim();
+                    String memMB = parts[3].replace("\"", "").trim();
+
+                    // Filter out system UI apps
+                    if (systemApps.contains(processName.toLowerCase())) {
+                        System.out.println("[APP MANAGER] Filtered out system app: " + processName);
+                        continue;
+                    }
+
+                    // Format output
+                    String appInfo = String.format("%-25s PID: %-8s  Mem: %4s MB  [%s]",
+                                                   processName, pid, memMB, windowTitle);
+
+                    result.append(appInfo).append("\n");
+                    count++;
+                }
             }
 
             int exitCode = p.waitFor();
 
             if (count == 0) {
                 System.out.println("[APP MANAGER] No GUI apps found, exit code: " + exitCode);
-                result.append("Khong tim thay ung dung nao co GUI.\n");
-                result.append("Luu y: Chi hien thi Apps (processes co MainWindowTitle), giong Task Manager.\n");
+                result.append("Khong tim thay ung dung nao.\n");
             } else {
                 result.append("\n").append("─────────────────────────────────────────\n");
                 result.append("Tong so: ").append(count).append(" ung dung");
