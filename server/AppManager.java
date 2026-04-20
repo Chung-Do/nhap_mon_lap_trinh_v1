@@ -91,10 +91,16 @@ public class AppManager {
                         continue;
                     }
 
+                    // Debug explorer windows
+                    if (processName.equalsIgnoreCase("explorer")) {
+                        System.out.println("[APP MANAGER] Explorer window: Title='" + windowTitle + "', PID=" + pid);
+                    }
+
                     // Skip Explorer with no window title (desktop/taskbar), but keep File Explorer windows
+                    // Desktop explorer usually has empty title or "Program Manager"
                     if (processName.equalsIgnoreCase("explorer") &&
-                        (windowTitle.isEmpty() || windowTitle.equals("(No Title)"))) {
-                        System.out.println("[APP MANAGER] Filtered out desktop explorer");
+                        (windowTitle.isEmpty() || windowTitle.equals("(No Title)") || windowTitle.equals("Program Manager"))) {
+                        System.out.println("[APP MANAGER] Filtered out desktop explorer (PID=" + pid + ")");
                         continue;
                     }
 
