@@ -77,12 +77,9 @@ public class AppManager {
                     String pid = parts[1].trim();
                     String memUsage = parts[4].trim();
 
-                    // Skip system processes
+                    // Skip only critical system processes
                     if (imageName.equalsIgnoreCase("System") ||
-                        imageName.equalsIgnoreCase("Registry") ||
-                        imageName.toLowerCase().startsWith("smss") ||
-                        imageName.toLowerCase().startsWith("csrss") ||
-                        imageName.toLowerCase().contains("svchost")) {
+                        imageName.equalsIgnoreCase("Registry")) {
                         continue;
                     }
 
