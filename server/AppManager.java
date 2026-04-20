@@ -30,12 +30,14 @@ public class AppManager {
         try {
             System.out.println("[APP MANAGER] Using PowerShell to get Apps with GUI (MainWindowTitle)...");
 
-            // PowerShell: Get processes with MainWindowTitle (= Apps in Task Manager)
+            // PowerShell: Get user apps (both with and without visible windows)
+            // Include processes with MainWindowTitle OR processes in user session with known app paths
             // Get FileDescription (friendly name) like Task Manager shows
             // Use PrivateMemorySize64 (Private Bytes) for accurate memory like Task Manager
-            // Use CSV format for accurate parsing
-            String psCommand = "Get-Process | Where-Object {$_.MainWindowTitle -ne ''} | " +
-                             "Select-Object ProcessName, Id, MainWindowTitle, " +
+            String psCommand = "Get-Process | Where-Object {" +
+                             "($_.MainWindowTitle -ne '') -or " +
+                             "($_.Path -like '*\\Program Files\\*' -or $_.Path -like '*\\Program Files (x86)\\*' -or $_.Path -like '*\\Users\\*')" +
+                             "} | Select-Object ProcessName, Id, MainWindowTitle, " +
                              "@{N='AppName';E={try{$_.MainModule.FileVersionInfo.FileDescription}catch{$_.ProcessName}}}, " +
                              "@{N='MemMB';E={[math]::Round($_.PrivateMemorySize64/1MB, 1)}} | " +
                              "ConvertTo-Csv -NoTypeInformation";
@@ -53,10 +55,10 @@ public class AppManager {
             int count = 0;
             boolean headerSkipped = false;
 
-            // Filter out Windows system UI apps
+            // Filter out Windows system UI apps (but keep ApplicationFrameHost for UWP apps like Solitaire)
             Set<String> systemApps = new HashSet<>(Arrays.asList(
                 "textinputhost", "searchapp", "startmenuexperiencehost",
-                "shellexperiencehost", "runtimebroker", "applicationframehost",
+                "shellexperiencehost", "runtimebroker",
                 "windowsinternal.composableshell.experiences.textinput.inputapp"
             ));
 
