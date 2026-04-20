@@ -54,11 +54,15 @@ public class AppManager {
             int count = 0;
             boolean headerSkipped = false;
 
-            // Filter out Windows system UI apps (but keep ApplicationFrameHost for UWP apps like Solitaire)
+            // Filter out Windows system processes (but keep ApplicationFrameHost for UWP apps)
             Set<String> systemApps = new HashSet<>(Arrays.asList(
                 "textinputhost", "searchapp", "startmenuexperiencehost",
                 "shellexperiencehost", "runtimebroker",
-                "windowsinternal.composableshell.experiences.textinput.inputapp"
+                "windowsinternal.composableshell.experiences.textinput.inputapp",
+                "explorer",        // Desktop/taskbar, not File Explorer windows
+                "svchost",         // Windows services host
+                "sihost",          // Shell Infrastructure Host
+                "taskhostw"        // Task Host Window
             ));
 
             while ((line = reader.readLine()) != null) {
@@ -91,9 +95,9 @@ public class AppManager {
                     // Use friendly name if available, fallback to process name
                     String displayName = (appName != null && !appName.isEmpty()) ? appName : processName;
 
-                    // Format output
-                    String appInfo = String.format("%-30s PID: %-8s  Mem: %4s MB",
-                                                   displayName, pid, memMB);
+                    // Format output with ProcessName so user knows what to use for Stop/Start
+                    String appInfo = String.format("%-30s (%-20s)  PID: %-8s  Mem: %4s MB",
+                                                   displayName, processName + ".exe", pid, memMB);
 
                     result.append(appInfo).append("\n");
                     count++;
