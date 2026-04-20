@@ -30,14 +30,13 @@ public class AppManager {
         try {
             System.out.println("[APP MANAGER] Using PowerShell to get Apps with GUI (MainWindowTitle)...");
 
-            // PowerShell: Get user apps (both with and without visible windows)
-            // Include processes with MainWindowTitle OR processes in user session with known app paths
+            // PowerShell: Get processes with MainWindowHandle (= Apps in Task Manager)
+            // Check MainWindowHandle instead of MainWindowTitle - some apps have window but no title
             // Get FileDescription (friendly name) like Task Manager shows
             // Use PrivateMemorySize64 (Private Bytes) for accurate memory like Task Manager
-            String psCommand = "Get-Process | Where-Object {" +
-                             "($_.MainWindowTitle -ne '') -or " +
-                             "($_.Path -like '*\\Program Files\\*' -or $_.Path -like '*\\Program Files (x86)\\*' -or $_.Path -like '*\\Users\\*')" +
-                             "} | Select-Object ProcessName, Id, MainWindowTitle, " +
+            String psCommand = "Get-Process | Where-Object {$_.MainWindowHandle -ne 0} | " +
+                             "Select-Object ProcessName, Id, " +
+                             "@{N='WindowTitle';E={if($_.MainWindowTitle){$_.MainWindowTitle}else{'(No Title)'}}}, " +
                              "@{N='AppName';E={try{$_.MainModule.FileVersionInfo.FileDescription}catch{$_.ProcessName}}}, " +
                              "@{N='MemMB';E={[math]::Round($_.PrivateMemorySize64/1MB, 1)}} | " +
                              "ConvertTo-Csv -NoTypeInformation";
