@@ -24,83 +24,99 @@ public class AppManager {
     }
 
     /**
-     * List running applications on Windows using tasklist /v
-     * This enumerates all windows like Task Manager does
+     * List running applications on Windows
      */
     private static String listAppsWindows() {
         try {
-            System.out.println("[APP MANAGER] Using tasklist /v to enumerate windows...");
+            System.out.println("[APP MANAGER] Using PowerShell to get Apps with GUI (MainWindowTitle)...");
 
-            // tasklist /v shows window titles (column 9 in CSV)
-            // /fo csv = CSV format, /nh = no header
-            ProcessBuilder pb = new ProcessBuilder("tasklist", "/v", "/fo", "csv", "/nh");
+            // PowerShell: Get processes with MainWindowHandle (= Apps in Task Manager)
+            // Check MainWindowHandle instead of MainWindowTitle - some apps have window but no title
+            // Get FileDescription (friendly name) like Task Manager shows
+            // Use PrivateMemorySize64 (Private Bytes) for accurate memory like Task Manager
+            String psCommand = "Get-Process | Where-Object {$_.MainWindowHandle -ne 0} | " +
+                             "Select-Object ProcessName, Id, " +
+                             "@{N='WindowTitle';E={if($_.MainWindowTitle){$_.MainWindowTitle}else{'(No Title)'}}}, " +
+                             "@{N='AppName';E={try{$_.MainModule.FileVersionInfo.FileDescription}catch{$_.ProcessName}}}, " +
+                             "@{N='MemMB';E={[math]::Round($_.PrivateMemorySize64/1MB, 1)}} | " +
+                             "ConvertTo-Csv -NoTypeInformation";
+
+            ProcessBuilder pb = new ProcessBuilder("powershell", "-Command", psCommand);
             pb.redirectErrorStream(true);
             Process p = pb.start();
 
-            // Use CP850 (OEM) encoding for Windows console
-            BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream(), "CP850"));
+            BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream(), "UTF-8"));
 
             StringBuilder result = new StringBuilder();
             result.append("=== RUNNING APPLICATIONS (Apps) ===\n\n");
 
             String line;
             int count = 0;
+            boolean headerSkipped = false;
 
-            // Track seen processes to avoid duplicates (gom multiple windows cung 1 process)
-            Set<String> seenProcesses = new HashSet<>();
-
-            // Filter out Windows system processes
-            Set<String> systemProcesses = new HashSet<>(Arrays.asList(
-                "system idle process", "system", "registry", "smss.exe", "csrss.exe",
-                "wininit.exe", "winlogon.exe", "services.exe", "lsass.exe", "svchost.exe",
-                "fontdrvhost.exe", "dwm.exe", "logonui.exe", "sihost.exe", "taskhostw.exe",
-                "ctfmon.exe", "runtimebroker.exe", "searchapp.exe", "startmenuexperiencehost.exe",
-                "textinputhost.exe", "shellexperiencehost.exe", "securityhealthsystray.exe",
-                "securityhealthservice.exe", "msmpeng.exe", "nissrv.exe", "sgrmbroker.exe",
-                "dllhost.exe", "conhost.exe", "smartscreen.exe", "wmiprvse.exe"
+            // Filter out Windows system processes (but keep ApplicationFrameHost for UWP apps)
+            Set<String> systemApps = new HashSet<>(Arrays.asList(
+                "textinputhost", "searchapp", "startmenuexperiencehost",
+                "shellexperiencehost", "runtimebroker",
+                "windowsinternal.composableshell.experiences.textinput.inputapp",
+                "svchost",         // Windows services host
+                "sihost",          // Shell Infrastructure Host
+                "taskhostw"        // Task Host Window
             ));
 
             while ((line = reader.readLine()) != null) {
-                // Parse CSV: "ImageName","PID","SessionName","Session#","MemUsage","Status","UserName","CPUTime","WindowTitle"
-                String[] parts = line.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
+                line = line.trim();
+                if (line.isEmpty()) continue;
 
-                if (parts.length >= 9) {
-                    String imageName = parts[0].replace("\"", "").trim();
+                // Skip CSV header
+                if (!headerSkipped) {
+                    if (line.startsWith("\"ProcessName\"") || line.startsWith("ProcessName")) {
+                        headerSkipped = true;
+                        continue;
+                    }
+                }
+
+                // Parse CSV line: "ProcessName","Id","MainWindowTitle","AppName","MemMB"
+                String[] parts = line.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)"); // Split CSV respecting quotes
+                if (parts.length >= 5) {
+                    String processName = parts[0].replace("\"", "").trim();
                     String pid = parts[1].replace("\"", "").trim();
-                    String sessionName = parts[2].replace("\"", "").trim();
-                    String memUsage = parts[4].replace("\"", "").trim();
-                    String windowTitle = parts[8].replace("\"", "").trim();
+                    String windowTitle = parts[2].replace("\"", "").trim();
+                    String appName = parts[3].replace("\"", "").trim();
+                    String memMB = parts[4].replace("\"", "").trim();
 
-                    // Filter: only user session (not Services)
-                    if (sessionName.equalsIgnoreCase("Services")) {
+                    // Filter out system UI apps
+                    if (systemApps.contains(processName.toLowerCase())) {
+                        System.out.println("[APP MANAGER] Filtered out system app: " + processName);
                         continue;
                     }
 
-                    // Filter: only processes with window titles (Apps section)
-                    if (windowTitle.isEmpty() ||
-                        windowTitle.equalsIgnoreCase("N/A") ||
-                        windowTitle.equalsIgnoreCase("Running")) {
+                    // Debug explorer windows
+                    if (processName.equalsIgnoreCase("explorer")) {
+                        System.out.println("[APP MANAGER] Explorer window: Title='" + windowTitle + "', PID=" + pid);
+                    }
+
+                    // Skip Explorer with no window title (desktop/taskbar), but keep File Explorer windows
+                    // Desktop explorer usually has empty title or "Program Manager"
+                    if (processName.equalsIgnoreCase("explorer") &&
+                        (windowTitle.isEmpty() || windowTitle.equals("(No Title)") || windowTitle.equals("Program Manager"))) {
+                        System.out.println("[APP MANAGER] Filtered out desktop explorer (PID=" + pid + ")");
                         continue;
                     }
 
-                    // Filter out system processes
-                    if (systemProcesses.contains(imageName.toLowerCase())) {
-                        continue;
+                    // For UWP apps (ApplicationFrameHost), use WindowTitle as display name
+                    String displayName;
+                    if (processName.equalsIgnoreCase("ApplicationFrameHost")) {
+                        // Use window title for UWP apps (Mail, Clock, etc.)
+                        displayName = windowTitle.isEmpty() ? appName : windowTitle;
+                    } else {
+                        // Use friendly name if available, fallback to process name
+                        displayName = (appName != null && !appName.isEmpty()) ? appName : processName;
                     }
 
-                    // Skip if we already added this process (gom multiple windows)
-                    String processKey = imageName.toLowerCase();
-                    if (seenProcesses.contains(processKey)) {
-                        continue;
-                    }
-                    seenProcesses.add(processKey);
-
-                    // Get friendly name (FileDescription) from exe
-                    String displayName = getFriendlyName(imageName, windowTitle);
-
-                    // Format output
-                    String appInfo = String.format("%-40s (%-20s)  PID: %-8s  Mem: %s",
-                                                   displayName, imageName, pid, memUsage);
+                    // Format output with ProcessName so user knows what to use for Stop/Start
+                    String appInfo = String.format("%-30s (%-20s)  PID: %-8s  Mem: %4s MB",
+                                                   displayName, processName + ".exe", pid, memMB);
 
                     result.append(appInfo).append("\n");
                     count++;
@@ -110,14 +126,14 @@ public class AppManager {
             int exitCode = p.waitFor();
 
             if (count == 0) {
-                System.out.println("[APP MANAGER] No apps found, exit code: " + exitCode);
+                System.out.println("[APP MANAGER] No GUI apps found, exit code: " + exitCode);
                 result.append("Khong tim thay ung dung nao.\n");
             } else {
                 result.append("\n").append("─────────────────────────────────────────\n");
                 result.append("Tong so: ").append(count).append(" ung dung");
             }
 
-            System.out.println("[APP MANAGER] Found " + count + " applications (exit code: " + exitCode + ")");
+            System.out.println("[APP MANAGER] Found " + count + " GUI applications (exit code: " + exitCode + ")");
             return result.toString();
 
         } catch (Exception e) {
@@ -127,49 +143,6 @@ public class AppManager {
                    "1. Chay server voi quyen Administrator\n" +
                    "2. Kiem tra Windows Defender khong block server";
         }
-    }
-
-    /**
-     * Get friendly name (FileDescription) using WMIC
-     * Fallback to manual mapping or window title
-     */
-    private static String getFriendlyName(String imageName, String windowTitle) {
-        // Manual mapping for common apps (fast, no need WMIC)
-        String lowerName = imageName.toLowerCase();
-        switch (lowerName) {
-            case "explorer.exe": return "Windows Explorer";
-            case "taskmgr.exe": return "Task Manager";
-            case "mspaint.exe": return "Paint";
-            case "notepad.exe": return "Notepad";
-            case "calc.exe": case "calculator.exe": return "Calculator";
-            case "msedge.exe": return "Microsoft Edge";
-            case "chrome.exe": return "Google Chrome";
-            case "firefox.exe": return "Mozilla Firefox";
-            case "wmplayer.exe": return "Windows Media Player";
-            case "cmd.exe": return "Command Prompt";
-            case "powershell.exe": return "Windows PowerShell";
-            case "applicationframehost.exe": return windowTitle; // UWP apps
-        }
-
-        // Try WMIC for other apps (slower but accurate)
-        try {
-            String wmic = "wmic process where \"name='" + imageName + "'\" get Description /value";
-            String result = JsonUtil.executeCommand(wmic);
-            if (result.contains("Description=")) {
-                String desc = result.substring(result.indexOf("Description=") + 12).trim();
-                if (!desc.isEmpty() && !desc.equalsIgnoreCase(imageName)) {
-                    return desc;
-                }
-            }
-        } catch (Exception e) {
-            // Ignore WMIC errors
-        }
-
-        // Fallback: use window title or process name
-        if (windowTitle != null && !windowTitle.isEmpty() && !windowTitle.equalsIgnoreCase("N/A")) {
-            return windowTitle;
-        }
-        return imageName.replace(".exe", "");
     }
 
 
