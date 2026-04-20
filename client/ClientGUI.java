@@ -155,7 +155,13 @@ public class ClientGUI extends JFrame {
         JPanel p = panel(); JPanel ctrl = flow();
         btn(ctrl, "Liet ke", () -> {
             conn.sendCommand(JsonUtil.buildCommand("LIST_APPS"));
-            setOutput(appsArea, extract(conn.readTextResponse()));
+            String response = conn.readTextResponse();
+            System.out.println("[DEBUG] LIST_APPS Response: " + response);
+            System.out.println("[DEBUG] Response length: " + response.length());
+            String extracted = extract(response);
+            System.out.println("[DEBUG] Extracted data: " + extracted);
+            System.out.println("[DEBUG] Extracted length: " + extracted.length());
+            setOutput(appsArea, extracted);
             log("LIST_APPS OK");
         });
         ctrl.add(new JLabel("Ten app:")); appStartField = field(ctrl, 14);

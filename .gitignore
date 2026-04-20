@@ -1,0 +1,11 @@
+# Build artifacts
+build/
+dist/
+
+# Java compiled files
+*.class
+
+# IDE
+.idea/
+*.iml
+.vscode/

@@ -67,6 +67,11 @@ public class AppManager {
                 // Split by whitespace (2+ spaces)
                 String[] parts = line.split("\\s{2,}");
 
+                // Debug first few lines
+                if (lineNum <= 10) {
+                    System.out.println("[APP MANAGER] Line " + lineNum + " parts: " + parts.length + " -> " + java.util.Arrays.toString(parts));
+                }
+
                 if (parts.length >= 5) {
                     String imageName = parts[0].trim();
                     String pid = parts[1].trim();
