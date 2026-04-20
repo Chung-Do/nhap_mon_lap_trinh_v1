@@ -9,3 +9,7 @@ dist/
 .idea/
 *.iml
 .vscode/
+
+# FFmpeg binary (too large for git)
+resources/ffmpeg/ffmpeg.exe
+ffmpeg_bundle/

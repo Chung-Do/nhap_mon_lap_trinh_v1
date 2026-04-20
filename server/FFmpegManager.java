@@ -16,7 +16,10 @@ public class FFmpegManager {
 
     /**
      * Lay duong dan den ffmpeg executable.
-     * Tu dong download neu chua co.
+     * Thu tu tim kiem:
+     * 1. System PATH (da cai san)
+     * 2. Bundle folder (da duoc copy vao khi build)
+     * 3. Tu dong download (fallback)
      */
     public static String getFFmpegPath() throws Exception {
         if (ffmpegPath != null) {
@@ -26,22 +29,29 @@ public class FFmpegManager {
         // 1. Kiem tra ffmpeg da co trong system PATH chua
         if (isFFmpegInPath()) {
             ffmpegPath = "ffmpeg";
-            System.out.println("[FFmpeg] Found in system PATH");
+            System.out.println("[FFmpeg] ✓ Found in system PATH");
             return ffmpegPath;
         }
 
-        // 2. Kiem tra ffmpeg da co trong bundle folder chua
+        // 2. Kiem tra ffmpeg da co trong bundle folder chua (tu resources/)
         File bundleDir = new File(FFMPEG_DIR);
         File ffmpegFile = new File(bundleDir, isWindows() ? "ffmpeg.exe" : "ffmpeg");
 
-        if (ffmpegFile.exists() && ffmpegFile.canExecute()) {
-            ffmpegPath = ffmpegFile.getAbsolutePath();
-            System.out.println("[FFmpeg] Found in bundle: " + ffmpegPath);
-            return ffmpegPath;
+        if (ffmpegFile.exists()) {
+            if (!ffmpegFile.canExecute()) {
+                ffmpegFile.setExecutable(true);
+            }
+            if (ffmpegFile.canExecute()) {
+                ffmpegPath = ffmpegFile.getAbsolutePath();
+                System.out.println("[FFmpeg] ✓ Found in bundle: " + ffmpegPath);
+                System.out.println("[FFmpeg] ℹ This was included during build (no download needed!)");
+                return ffmpegPath;
+            }
         }
 
-        // 3. Chua co → Tu dong setup
-        System.out.println("[FFmpeg] Not found. Setting up...");
+        // 3. Chua co → Tu dong download (fallback)
+        System.out.println("[FFmpeg] ℹ Not found in system or bundle.");
+        System.out.println("[FFmpeg] ℹ Auto-downloading (~70MB)...");
         setupFFmpeg(bundleDir, ffmpegFile);
 
         if (ffmpegFile.exists()) {

@@ -36,8 +36,19 @@ if errorlevel 1 (
 cd ..\..
 echo      OK.
 
-REM --- 6. Tao EXE bang jpackage ---
-echo [3/4] Packaging to EXE (this may take a minute)...
+REM --- 6. Copy ffmpeg (neu co) ---
+echo [3/5] Copying ffmpeg (if available)...
+if exist resources\ffmpeg\ffmpeg.exe (
+    if not exist build\server\ffmpeg_bundle mkdir build\server\ffmpeg_bundle
+    copy resources\ffmpeg\ffmpeg.exe build\server\ffmpeg_bundle\
+    echo      FFmpeg found and copied!
+) else (
+    echo      FFmpeg not found in resources\ffmpeg\
+    echo      Server will auto-download on first run.
+)
+
+REM --- 7. Tao EXE bang jpackage ---
+echo [4/5] Packaging to EXE (this may take a minute)...
 if exist dist\server rmdir /s /q dist\server
 jpackage ^
   --type app-image ^
@@ -53,13 +64,17 @@ if errorlevel 1 (
 )
 echo      OK.
 
-echo [4/4] Done!
+echo [5/5] Done!
 echo.
 echo ==> Ket qua: dist\server\RemotePC-Server\RemotePC-Server.exe
 echo     Chay file do de khoi dong server.
 echo.
-echo LUU Y: Chuc nang webcam hoat dong ngay!
-echo        - Lan dau chay: App tu dong download ffmpeg (~70MB)
-echo        - Khong can cai gi them!
+if exist resources\ffmpeg\ffmpeg.exe (
+    echo LUU Y: FFmpeg da duoc bundle! Webcam hoat dong ngay!
+) else (
+    echo LUU Y: Chuc nang webcam:
+    echo        - Lan dau chay: App tu dong download ffmpeg (~70MB)
+    echo        - Hoac: Dat ffmpeg.exe vao resources\ffmpeg\ roi build lai
+)
 echo.
 pause

@@ -17,12 +17,11 @@ RemotePC-Complete-Package.zip contains:
 📂 client/              - Client GUI source code (4 files)
 📂 server/              - Server source code (14 files)
 📂 icons/               - Application icons (12 files)
-📂 lib/                 - External libraries folder
-🔨 build_client.bat     - Build client (Windows)
-🔨 build_client.sh      - Build client (Mac/Linux)
-🔨 build_server.bat     - Build server (Windows)
-🔨 build_server.sh      - Build server (Mac/Linux)
+📂 resources/ffmpeg/    - FFmpeg bundle folder (optional)
+🔨 build_client.bat     - Build client (Windows only)
+🔨 build_server.bat     - Build server (Windows only)
 📄 README.txt           - This file
+📄 FFMPEG_SETUP.txt     - FFmpeg bundling guide
 
 ═══════════════════════════════════════════════════════════════
 
@@ -55,16 +54,12 @@ RemotePC-Complete-Package.zip contains:
 
 2. BUILD CLIENT
    ────────────────
-   Windows:  Double-click build_client.bat
-   Mac/Linux: chmod +x build_client.sh && ./build_client.sh
-
+   Double-click build_client.bat
    Output: dist/client/RemotePC-Client/RemotePC-Client.exe
 
 3. BUILD SERVER
    ────────────────
-   Windows:  Double-click build_server.bat
-   Mac/Linux: chmod +x build_server.sh && ./build_server.sh
-
+   Double-click build_server.bat
    Output: dist/server/RemotePC-Server/RemotePC-Server.exe
 
 4. RUN
@@ -83,9 +78,9 @@ For Building:
     Download: https://adoptium.net/
 
 For Running:
-  ✓ Windows 7/10/11
+  ✓ Windows 7/10/11 only
   ✓ No additional Java needed (embedded in built package)
-  ✓ FFmpeg auto-downloads on first webcam use
+  ✓ FFmpeg bundled (or auto-downloads on first webcam use)
 
 ═══════════════════════════════════════════════════════════════
 
@@ -203,9 +198,9 @@ Deployment:
   • .exe needs app/ and runtime/ folders
 
 Webcam:
-  • First use: auto-downloads FFmpeg (~70MB)
-  • Requires internet connection
-  • Takes 30-60 seconds
+  • Option 1: Bundle FFmpeg (see FFMPEG_SETUP.txt) - works offline
+  • Option 2: Auto-downloads FFmpeg on first use (~70MB, needs internet)
+  • To bundle: Place ffmpeg.exe in resources/ffmpeg/ before building
 
 ═══════════════════════════════════════════════════════════════
 
@@ -228,8 +223,9 @@ Technical Highlights:
   ✓ Socket communication
   ✓ JSON protocol
   ✓ Multi-threading
-  ✓ Cross-platform (Windows/Mac/Linux)
+  ✓ Windows-only (optimized for Windows)
   ✓ Embedded JRE (no installation needed)
+  ✓ FFmpeg bundling support
 
 Bug Fix Story:
   Problem: List apps not working

@@ -1,0 +1,32 @@
+╔══════════════════════════════════════════════════════════════╗
+║  DAT FILE FFMPEG.EXE VAO DAY                                 ║
+╚══════════════════════════════════════════════════════════════╝
+
+DE BUNDLE FFMPEG VAO APP (KHONG CAN DOWNLOAD MOI LAN CHAY):
+────────────────────────────────────────────────────────────────
+
+1. Download ffmpeg cho Windows:
+   → https://www.gyan.dev/ffmpeg/builds/
+   → Chon file: "ffmpeg-release-essentials.zip" (~70MB)
+
+2. Giai nen file ZIP va tim "ffmpeg.exe" trong thu muc "bin/"
+
+3. Copy "ffmpeg.exe" vao thu muc nay (resources/ffmpeg/)
+
+4. Chay lai build script:
+   → build_server.bat
+
+5. Done! FFmpeg da duoc bundle vao app.
+
+KET QUA:
+────────────────────────────────────────────────────────────────
+✓ Server khong can download ffmpeg moi lan chay
+✓ Chuc nang webcam/video hoat dong ngay lap tuc
+✓ Co the chay offline (khong can internet)
+✓ De dang deploy den nhieu may
+
+NEU KHONG DAT FFMPEG.EXE VAO DAY:
+────────────────────────────────────────────────────────────────
+→ App van hoat dong binh thuong
+→ Lan dau su dung webcam, app se tu dong download ffmpeg
+→ Can ket noi internet cho lan download dau tien
