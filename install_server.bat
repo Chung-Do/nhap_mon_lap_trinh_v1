@@ -39,24 +39,23 @@ REM --- 3. Tải phiên bản mới nhất từ GitHub ---
 echo [2/5] Downloading latest version from GitHub...
 echo      Please wait...
 
-REM Lấy URL của release mới nhất
+REM Download trực tiếp từ release "latest"
+set "DOWNLOAD_URL=https://github.com/%GITHUB_REPO%/releases/download/latest/RemotePC-Server.zip"
+
 powershell -Command ^
-    "$repo = '%GITHUB_REPO%'; " ^
-    "$apiUrl = 'https://api.github.com/repos/' + $repo + '/releases/latest'; " ^
     "try { " ^
-    "    $release = Invoke-RestMethod -Uri $apiUrl; " ^
-    "    $asset = $release.assets | Where-Object { $_.name -eq 'RemotePC-Server.zip' }; " ^
-    "    if ($asset) { " ^
-    "        Write-Host '      Downloading:' $asset.name '(' ([math]::Round($asset.size/1MB, 2)) 'MB)'; " ^
-    "        Invoke-WebRequest -Uri $asset.browser_download_url -OutFile '%TEMP_ZIP%'; " ^
-    "        Write-Host '      Download complete!' -ForegroundColor Green; " ^
-    "    } else { " ^
-    "        Write-Host '      ERROR: RemotePC-Server.zip not found in latest release' -ForegroundColor Red; " ^
-    "        exit 1; " ^
-    "    } " ^
+    "    Write-Host '      Downloading from: %DOWNLOAD_URL%'; " ^
+    "    Invoke-WebRequest -Uri '%DOWNLOAD_URL%' -OutFile '%TEMP_ZIP%' -UseBasicParsing; " ^
+    "    $sizeMB = [math]::Round((Get-Item '%TEMP_ZIP%').Length / 1MB, 2); " ^
+    "    Write-Host '      Download complete!' $sizeMB 'MB' -ForegroundColor Green; " ^
     "} catch { " ^
-    "    Write-Host '      ERROR: Failed to download. Check internet connection.' -ForegroundColor Red; " ^
-    "    Write-Host '      Details:' $_.Exception.Message; " ^
+    "    Write-Host '      ERROR: Failed to download.' -ForegroundColor Red; " ^
+    "    Write-Host '      URL: %DOWNLOAD_URL%' -ForegroundColor Yellow; " ^
+    "    Write-Host '      Please check:' -ForegroundColor Yellow; " ^
+    "    Write-Host '        1. Internet connection' -ForegroundColor Yellow; " ^
+    "    Write-Host '        2. GitHub Actions has built the release' -ForegroundColor Yellow; " ^
+    "    Write-Host '        3. Release tag \"latest\" exists' -ForegroundColor Yellow; " ^
+    "    Write-Host '      Details:' $_.Exception.Message -ForegroundColor Red; " ^
     "    exit 1; " ^
     "}"
 
