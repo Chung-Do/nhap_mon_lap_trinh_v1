@@ -43,21 +43,21 @@ REM Download trực tiếp từ release "latest"
 set "DOWNLOAD_URL=https://github.com/%GITHUB_REPO%/releases/download/latest/RemotePC-Server.zip"
 
 powershell -Command ^
-    "try { " ^
-    "    Write-Host '      Downloading from: %DOWNLOAD_URL%'; " ^
-    "    Invoke-WebRequest -Uri '%DOWNLOAD_URL%' -OutFile '%TEMP_ZIP%' -UseBasicParsing; " ^
-    "    $sizeMB = [math]::Round((Get-Item '%TEMP_ZIP%').Length / 1MB, 2); " ^
-    "    Write-Host '      Download complete!' $sizeMB 'MB' -ForegroundColor Green; " ^
-    "} catch { " ^
-    "    Write-Host '      ERROR: Failed to download.' -ForegroundColor Red; " ^
-    "    Write-Host '      URL: %DOWNLOAD_URL%' -ForegroundColor Yellow; " ^
-    "    Write-Host '      Please check:' -ForegroundColor Yellow; " ^
-    "    Write-Host '        1. Internet connection' -ForegroundColor Yellow; " ^
-    "    Write-Host '        2. GitHub Actions has built the release' -ForegroundColor Yellow; " ^
-    "    Write-Host '        3. Release tag \"latest\" exists' -ForegroundColor Yellow; " ^
-    "    Write-Host '      Details:' $_.Exception.Message -ForegroundColor Red; " ^
-    "    exit 1; " ^
-    "}"
+    "try { ^
+        Write-Host '      Downloading from: %DOWNLOAD_URL%'; ^
+        Invoke-WebRequest -Uri '%DOWNLOAD_URL%' -OutFile '%TEMP_ZIP%' -UseBasicParsing; ^
+        $sizeMB = [math]::Round((Get-Item '%TEMP_ZIP%').Length / 1MB, 2); ^
+        Write-Host '      Download complete!' $sizeMB 'MB' -ForegroundColor Green; ^
+    } catch { ^
+        Write-Host '      ERROR: Failed to download.' -ForegroundColor Red; ^
+        Write-Host '      URL: %DOWNLOAD_URL%' -ForegroundColor Yellow; ^
+        Write-Host '      Please check:' -ForegroundColor Yellow; ^
+        Write-Host '        1. Internet connection' -ForegroundColor Yellow; ^
+        Write-Host '        2. GitHub Actions has built the release' -ForegroundColor Yellow; ^
+        Write-Host '        3. Release tag latest exists' -ForegroundColor Yellow; ^
+        Write-Host '      Details:' $_.Exception.Message -ForegroundColor Red; ^
+        exit 1; ^
+    }"
 
 if errorlevel 1 (
     echo.
@@ -73,13 +73,13 @@ if errorlevel 1 (
 REM --- 4. Giải nén ---
 echo [3/5] Extracting files...
 powershell -Command ^
-    "try { " ^
-    "    Expand-Archive -Path '%TEMP_ZIP%' -DestinationPath '%INSTALL_DIR%' -Force; " ^
-    "    Write-Host '      Extracted successfully!' -ForegroundColor Green; " ^
-    "} catch { " ^
-    "    Write-Host '      ERROR: Failed to extract ZIP' -ForegroundColor Red; " ^
-    "    exit 1; " ^
-    "}"
+    "try { ^
+        Expand-Archive -Path '%TEMP_ZIP%' -DestinationPath '%INSTALL_DIR%' -Force; ^
+        Write-Host '      Extracted successfully!' -ForegroundColor Green; ^
+    } catch { ^
+        Write-Host '      ERROR: Failed to extract ZIP' -ForegroundColor Red; ^
+        exit 1; ^
+    }"
 
 if errorlevel 1 (
     echo [ERROR] Extraction failed!
@@ -95,12 +95,12 @@ echo      Temporary files removed.
 REM --- 6. Tạo shortcut (optional) ---
 echo [5/5] Creating shortcuts...
 powershell -Command ^
-    "$WshShell = New-Object -ComObject WScript.Shell; " ^
-    "$Shortcut = $WshShell.CreateShortcut('%USERPROFILE%\Desktop\RemotePC Server.lnk'); " ^
-    "$Shortcut.TargetPath = '%INSTALL_DIR%\RemotePC-Server\RemotePC-Server.exe'; " ^
-    "$Shortcut.WorkingDirectory = '%INSTALL_DIR%\RemotePC-Server'; " ^
-    "$Shortcut.Description = 'RemotePC Server'; " ^
-    "$Shortcut.Save();"
+    "$WshShell = New-Object -ComObject WScript.Shell; ^
+    $Shortcut = $WshShell.CreateShortcut('%USERPROFILE%\Desktop\RemotePC Server.lnk'); ^
+    $Shortcut.TargetPath = '%INSTALL_DIR%\RemotePC-Server\RemotePC-Server.exe'; ^
+    $Shortcut.WorkingDirectory = '%INSTALL_DIR%\RemotePC-Server'; ^
+    $Shortcut.Description = 'RemotePC Server'; ^
+    $Shortcut.Save();"
 echo      Desktop shortcut created!
 
 echo.
