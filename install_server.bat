@@ -39,21 +39,53 @@ if not exist "%INSTALL_DIR%" (
 REM --- 3. Tải phiên bản mới nhất từ GitHub ---
 echo [2/5] Downloading latest version from GitHub...
 echo      URL: %DOWNLOAD_URL%
-echo      Please wait...
+echo.
 
-curl -L -o "%TEMP_ZIP%" "%DOWNLOAD_URL%" --progress-bar --fail --silent --show-error
+REM Xóa file cũ nếu có
+if exist "%TEMP_ZIP%" del /q "%TEMP_ZIP%" 2>nul
+
+REM Download với progress bar chi tiết
+REM -L: follow redirects
+REM -o: output file
+REM --fail: fail silently on HTTP errors
+REM --connect-timeout 10: timeout nếu không kết nối được trong 10s
+REM --max-time 600: timeout nếu tổng thời gian > 10 phút
+REM -#: progress bar
+
+echo      Connecting to GitHub...
+curl -L -o "%TEMP_ZIP%" "%DOWNLOAD_URL%" --fail --connect-timeout 10 --max-time 600 -#
 
 if errorlevel 1 (
     echo.
     echo [ERROR] Download failed!
-    echo         - Check your internet connection
-    echo         - Verify release exists: https://github.com/%GITHUB_REPO%/releases/tag/latest
-    echo         - Make sure repository is public
+    echo.
+    echo Possible reasons:
+    echo   1. Network connection issue (check your internet)
+    echo   2. GitHub release not found (check: https://github.com/%GITHUB_REPO%/releases/tag/latest)
+    echo   3. Repository is private (make it public)
+    echo   4. Connection timeout (slow network or server issue)
+    echo.
+    echo Troubleshooting:
+    echo   - Try opening the URL in browser to verify it exists
+    echo   - Check if you can access github.com
+    echo   - Wait a few minutes and try again
     echo.
     pause
     exit /b 1
 )
 
+REM Kiểm tra file size
+for %%A in ("%TEMP_ZIP%") do set "FILESIZE=%%~zA"
+if %FILESIZE% LSS 1000000 (
+    echo.
+    echo [WARNING] Downloaded file is suspiciously small (^<%FILESIZE% bytes^)
+    echo           This might not be the correct file.
+    echo.
+    echo Press any key to continue anyway, or Ctrl+C to cancel...
+    pause >nul
+)
+
+echo.
 echo      Download complete!
 
 REM --- 4. Giải nén ---
