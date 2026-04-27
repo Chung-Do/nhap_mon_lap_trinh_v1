@@ -9,18 +9,16 @@
      Directory exists: C:\Users\workw\RemotePC
 [2/5] Downloading latest version from GitHub...
      URL: https://github.com/Chung-Do/nhap_mon_lap_trinh_v1/releases/download/latest/RemotePC-Server.zip
+     File size: ~50-60 MB
 
-     Removing old download file...
+     Please wait, this may take 5-10 minutes depending on your network speed...
+
+     Found partial download, resuming...
+** Resuming transfer from byte position 55792588
   % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
                                  Dload  Upload  Total   Spent   Left   Speed
   0      0   0      0   0      0      0      0                              0
- 37 53.20M  37 19.97M   0      0 110.3k      0   08:13   03:05   05:08  86789
-curl: (18) end of response with 34821068 bytes missing
-
-[ERROR] Download failed
-
-Possible reasons:
-  1. Unstable network connection (file is ~80-100MB
+  0      0   0      0   0      0      0      0                              0
   2. GitHub release not found or file not uploaded properly
   3. Firewall/Antivirus blocking download
   4. Network timeout (slow connection)
