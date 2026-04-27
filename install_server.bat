@@ -40,23 +40,26 @@ if not exist "%INSTALL_DIR%" (
 REM --- 3. Tải phiên bản mới nhất từ GitHub ---
 echo [2/5] Downloading latest version from GitHub...
 echo      URL: %DOWNLOAD_URL%
+echo      File size: ~50-60 MB
+echo.
+echo      Please wait, this may take 5-10 minutes depending on your network speed...
 echo.
 
-REM Xóa file cũ trước khi download (tránh corrupt)
+REM KHÔNG xóa file cũ - cho phép resume nếu download bị ngắt
 if exist "%TEMP_ZIP%" (
-    echo      Removing old download file...
-    del /f /q "%TEMP_ZIP%" 2>nul
+    echo      Found partial download, resuming...
 )
 
-REM Download with curl - single attempt with extended timeout for large files
+REM Download with curl (built-in on Windows 10)
+REM Optimized for unreliable connections with resume capability
 REM -L: follow redirects
-REM --progress-bar: show progress with speed and time remaining
+REM -C -: resume from where it left off (safe with GitHub)
 REM --connect-timeout 15: 15 seconds to establish connection
-REM --max-time 300: 5 minute timeout (for ~80-100MB file)
-REM --retry 5: retry 5 times on transient errors
-REM --retry-delay 5: wait 5 seconds between retries
-REM --retry-max-time 750: maximum 12.5 minutes total for all retries
-curl -L -o "%TEMP_ZIP%" "%DOWNLOAD_URL%" --connect-timeout 15 --max-time 300 --retry 5 --retry-delay 5 --retry-max-time 750
+REM --max-time 900: 15 minute timeout per attempt
+REM --retry 5: retry 5 times (important for unstable connections)
+REM --retry-delay 3: wait 3 seconds between retries
+REM --retry-max-time 0: no limit on total retry time
+curl -L -C - -o "%TEMP_ZIP%" "%DOWNLOAD_URL%" --connect-timeout 15 --max-time 900 --retry 5 --retry-delay 3 --retry-max-time 0
 
 if errorlevel 1 (
     echo.
