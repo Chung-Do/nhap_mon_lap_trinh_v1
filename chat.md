@@ -2100,778 +2100,94 @@ hiện tại, để chạy được chương trình trên server, tôi phải:
 
 Hãy giúp tôi làm việc sau:
 - mỗi lần chỉnh sửa code, tự build source code và đóng gói các đoạn code cần cho server vào 1 file zip
-- tạo ra 1 file bat khác để tôi gửi cho máy server, khi cho file bat chạy, nó sẽ tự động download file zip đã được build đó về, giải nén và chạy file server.exe
 
 Hiện tại source code của tôi đang được quản lý bởi github
 
 ----
 
-Tốt! Bây giờ tôi sẽ tạo hệ thống tự động hóa cho bạn. Hệ thống này sẽ bao gồm:
+Tôi sẽ tạo một workflow để:
 
-GitHub Actions workflow - Tự động build và tạo release khi có code mới
-Script đóng gói - Đóng gói server thành ZIP
-Auto-installer BAT - Script cho máy server tự động tải và chạy
+1. Tự động build mỗi khi có thay đổi code
+2. Đóng gói các file cần thiết vào file ZIP
+3. Upload artifact để bạn có thể tải về
 
-# 🚀 Hướng Dẫn Triển Khai RemotePC Server
+Bây giờ tôi sẽ tạo thêm một script để bạn có thể chạy local, và một script hướng dẫn deploy lên server:
 
-## 📋 Tổng Quan
+Tuyệt vời! Bây giờ tôi sẽ tạo một bản tóm tắt và hướng dẫn bạn commit các thay đổi:
 
-Có 3 phương pháp triển khai server:
+✅ Hoàn thành! Đã tạo hệ thống tự động build và deploy
+📦 Các file đã được tạo:
+.github/workflows/build-server.yml - GitHub Actions workflow tự động build
+build_and_package.bat - Script build local nhanh
+QUICKSTART.md - Hướng dẫn nhanh (3 bước)
+DEPLOY_GUIDE.md - Hướng dẫn deploy chi tiết
+README.md - Documentation đầy đủ
+🚀 Cách sử dụng:
+Phương án 1: Tự động với GitHub Actions ⭐ (Khuyến nghị)
 
-1. **Tự động qua GitHub Actions** (Recommended) ⭐
-2. **Quick Deploy - HTTP Server** (Cho testing nhanh)
-3. **Thủ công** (Upload file ZIP)
-
----
-
-## 🔧 Phương Pháp 1: Tự Động với GitHub Actions (RECOMMENDED)
-
-### Setup lần đầu:
-
-#### Bước 1: Push code lên GitHub
-
-```bash
+# Commit và push code
 git add .
-git commit -m "Add auto-deployment"
-git push origin main
-```
-
-#### Bước 2: Đảm bảo repository settings
-
-1. Vào GitHub repo → **Settings** → **Actions** → **General**
-2. Trong **Workflow permissions**, chọn:
-   - ✅ **Read and write permissions**
-3. Save
-
-#### Bước 3: Trigger build
-
-**Option A: Tự động** - Mỗi khi push code vào `main` branch:
-```bash
-git add server/Server.java
-git commit -m "Update server code"
-git push origin main
-```
-
-**Option B: Thủ công** - Vào GitHub:
-1. Repo → **Actions** tab
-2. Chọn workflow "Build and Release Server"
-3. Click **Run workflow**
-
-#### Bước 4: Đợi build xong (2-5 phút)
-
-Theo dõi tiến trình tại: **Actions** tab
-
-#### Bước 5: Download trên máy server
-
-Khi build xong, vào **Releases** tab, copy link download và chạy trên máy server:
-
-**Cách 1: Auto-install script**
-```cmd
-curl -L -o install.bat https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/install_server.bat
-install.bat
-```
-
-**Cách 2: Manual download**
-1. Vào: `https://github.com/YOUR_USERNAME/YOUR_REPO/releases/latest`
-2. Download `RemotePC-Server.zip`
-3. Extract và chạy `RemotePC-Server.exe`
-
----
-
-## ⚡ Phương Pháp 2: Quick Deploy (Cho Testing Nhanh)
-
-### Khi nào dùng?
-- Đang develop, cần test nhanh
-- Không muốn push lên GitHub mỗi lần thay đổi
-- Máy dev và máy server trong cùng mạng LAN
-
-### Các bước:
-
-#### Bước 1: Trên máy dev, chạy:
-```cmd
-quick_deploy.bat
-```
-
-Script sẽ:
-1. Build server
-2. Đóng gói ZIP
-3. Start HTTP server trên port 8000
-4. Hiển thị IP của bạn (ví dụ: `192.168.1.100`)
-
-#### Bước 2: Trên máy server, download và chạy:
-
-**Cách 1: PowerShell one-liner (FASTEST)**
-```powershell
-iwr http://192.168.1.100:8000/RemotePC-Server.zip -OutFile $env:TEMP\RemotePC.zip; Expand-Archive $env:TEMP\RemotePC.zip -DestinationPath $env:USERPROFILE\RemotePC -Force; Start-Process $env:USERPROFILE\RemotePC\RemotePC-Server\RemotePC-Server.exe
-```
-
-**Cách 2: Từng bước**
-```cmd
-curl -O http://192.168.1.100:8000/RemotePC-Server.zip
-tar -xf RemotePC-Server.zip
-cd RemotePC-Server
-RemotePC-Server.exe
-```
-
-**Cách 3: Qua browser**
-- Mở: `http://192.168.1.100:8000/`
-- Click download
-- Extract và chạy
-
----
-
-## 📦 Phương Pháp 3: Thủ Công
-
-### Khi nào dùng?
-- Không có GitHub
-- Không có mạng LAN
-- Chuyển qua USB
-
-### Các bước:
-
-#### Bước 1: Đóng gói
-```cmd
-package_server.bat
-```
-
-Output: `RemotePC-Server.zip`
-
-#### Bước 2: Chuyển file
-- **USB**: Copy ZIP vào USB, cắm vào máy server
-- **Email**: Gửi ZIP qua email (nếu < 25MB)
-- **Google Drive**: Upload lên Drive, download trên máy server
-- **Network Share**: Copy vào shared folder
-
-#### Bước 3: Trên máy server
-1. Extract `RemotePC-Server.zip`
-2. Vào folder `RemotePC-Server`
-3. Chạy `RemotePC-Server.exe`
-
----
-
-## 🔄 Workflow Hàng Ngày
-
-### Scenario 1: Update code thường xuyên (GitHub Actions)
-
-```bash
-# 1. Code như bình thường
-# Edit: server/Server.java
-
-# 2. Commit và push
-git add .
-git commit -m "Add new feature"
-git push
-
-# 3. Đợi GitHub Actions build (2-5 phút)
-# 4. Trên máy server, chạy lại:
-install_server.bat  # Sẽ tự động tải bản mới nhất
-```
-
-### Scenario 2: Test nhanh local (Quick Deploy)
-
-```cmd
-# 1. Trên máy dev:
-quick_deploy.bat
-
-# 2. Trên máy server (trong LAN):
-curl -O http://192.168.1.100:8000/RemotePC-Server.zip
-tar -xf RemotePC-Server.zip
-cd RemotePC-Server
-RemotePC-Server.exe
-```
-
----
-
-## 🛠️ Troubleshooting
-
-### ❌ GitHub Actions build fail
-
-**Lỗi: "permission denied"**
-```
-Fix: Settings → Actions → Workflow permissions → Read and write
-```
-
-**Lỗi: "jpackage not found"**
-```
-Fix: GitHub Actions đã dùng JDK 17 (có jpackage), check build log
-```
-
-### ❌ Install script không tải được
-
-**Lỗi: "Could not download"**
-```
-1. Check internet connection trên máy server
-2. Check repository là PUBLIC (không phải private)
-3. Verify repository name trong install_server.bat:
-   set "GITHUB_REPO=YOUR_USERNAME/YOUR_REPO"
-```
-
-**Lỗi: "Rate limit exceeded"**
-```
-GitHub API giới hạn 60 requests/hour cho unauthenticated
-Wait 1 giờ hoặc dùng GitHub token (advanced)
-```
-
-### ❌ Quick Deploy không kết nối được
-
-**Lỗi: "Connection refused"**
-```
-1. Check firewall trên máy dev (allow port 8000)
-2. Verify IP address đúng: ipconfig
-3. Đảm bảo cả 2 máy trong cùng LAN
-```
-
-**Lỗi: "Python not found"**
-```
-Install Python từ: https://www.python.org/downloads/
-Hoặc dùng method khác (GitHub Actions / Manual)
-```
-
----
-
-## 📊 So Sánh Các Phương Pháp
-
-| Tiêu chí | GitHub Actions | Quick Deploy | Manual |
-|----------|----------------|--------------|---------|
-| **Setup lần đầu** | ⚠️ Medium (cần setup GitHub) | ✅ Easy | ✅ Easy |
-| **Tốc độ update** | ⏱️ 2-5 phút | ⚡ 30 giây | 🐌 5-10 phút |
-| **Internet required** | ✅ Yes (cả dev & server) | ❌ No (chỉ cần LAN) | ⚠️ Optional |
-| **Automation** | ✅✅✅ Full auto | ✅✅ Semi-auto | ❌ Manual |
-| **Version control** | ✅ Có (GitHub Releases) | ❌ Không | ❌ Không |
-| **Rollback** | ✅ Easy (download old release) | ❌ Khó | ❌ Khó |
-| **Best for** | Production, team | Quick testing | No network |
-
----
-
-## 🎯 Khuyến Nghị
-
-### Cho Development:
-```
-Use: Quick Deploy
-Why: Nhanh nhất, không cần internet, test ngay
-```
-
-### Cho Production/Demo:
-```
-Use: GitHub Actions
-Why: Professional, có version history, rollback dễ
-```
-
-### Cho Offline/USB:
-```
-Use: Manual
-Why: Không cần network
-```
-
----
-
-## 🔐 Security Notes (Quan trọng!)
-
-### Nếu repo là PUBLIC:
-⚠️ **KHÔNG commit secrets** vào code (passwords, API keys)
-
-### Nếu cần private:
-1. Repo → Settings → Change visibility → Private
-2. Update `install_server.bat` để dùng Personal Access Token:
-   ```bat
-   set "GITHUB_TOKEN=ghp_xxxxxxxxxxxx"
-   ```
-
-### Firewall:
-Server cần allow port **8888** (TCP) để client kết nối:
-```cmd
-netsh advfirewall firewall add rule name="RemotePC Server" dir=in action=allow protocol=TCP localport=8888
-```
-
----
-
-## 🚀 Quick Start (TL;DR)
-
-```bash
-# === LẦN ĐẦU SETUP ===
-
-# 1. Push to GitHub
-git add .
-git commit -m "Setup auto deployment"
+git commit -m "Add auto build and deploy system"
 git push origin main
 
-# 2. Enable GitHub Actions
-# Repo → Settings → Actions → Read and write permissions
+# Sau đó:
+# 1. Vào GitHub → Tab "Actions"
+# 2. Xem workflow "Build Server Package" chạy
+# 3. Download artifact "server-package" (ZIP)
+# 4. Giải nén và chạy trên server
+Phương án 2: Build local (Nhanh - 30 giây)
 
-# 3. Wait for build (check Actions tab)
+# Chạy script
+build_and_package.bat
 
-# === MỖI LẦN UPDATE ===
+# Output: server-package.zip
+# → Copy lên server → Giải nén → Double-click run_server.bat
+📋 Quy trình hàng ngày:
 
-# Dev machine:
-git add .
-git commit -m "Update features"
-git push
+Sửa code → Push GitHub → GitHub Actions tự build → Download ZIP → Deploy
+Hoặc nhanh hơn:
 
-# Server machine (when build done):
-install_server.bat
 
-# DONE! 🎉
-```
-Giờ hãy cập nhật file .gitignore để không commit các file build:
+Sửa code → build_and_package.bat → Copy ZIP lên server → Done!
+🎯 Bạn muốn commit các thay đổi này không?
+Tôi có thể giúp bạn commit với message chi tiết. Bạn có muốn tôi:
 
-Read .gitignore
-Edit .gitignore
-Added 9 lines
-Cuối cùng, tạo file README ngắn về deployment:
+Commit tất cả các file mới
+Push lên GitHub
+Kiểm tra GitHub Actions có chạy thành công không?
+Hãy cho tôi biết nếu bạn cần!
 
-Write README_DEPLOYMENT.md
-112 lines
-# 🚀 Quick Deployment Guide
+------
 
-## 📥 Cài Server Tự Động (1 Lệnh)
+Khoan đã, tôi đã thử và thấy việc download khá bất tiện:
+mỗi khi có code mới, workflow sẽ được trigger và lưu artifact loại -> tôi luôn phải kiếm workflow gần nhất để download.
+Có cách nào tôi tạo được link cố định cho các artifact này không?
 
-Trên máy server Windows, chạy:
+------
 
-```cmd
-curl -L -o install.bat https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/install_server.bat && install.bat
-```
+Rất tốt! Bạn đã phát hiện ra vấn đề thực tế. Để tạo link cố định cho artifact:
 
-**Thay `YOUR_USERNAME/YOUR_REPO` bằng tên GitHub repo của bạn!**
+GitHub Releases (Khuyến nghị) ⭐
+Tạo release tự động với link cố định dạng:
 
----
 
-## 🔄 Update Server
+https://github.com/USERNAME/REPO/releases/latest/download/server-package.zip
+Tôi sẽ cập nhật workflow để tự động tạo release:
 
-Mỗi khi update code:
+Tuyệt vời! Bạn đã có workflow sẵn rồi, và nó đã có tính năng tạo release với tag "latest"! Điều này có nghĩa là bạn ĐÃ CÓ LINK CỐ ĐỊNH rồi đấy!
 
-### 1. Trên máy dev:
-```bash
-git add .
-git commit -m "Update features"
-git push origin main
-```
+🎉 Link cố định của bạn:
 
-### 2. Đợi build xong (2-5 phút)
-Check tại: `https://github.com/YOUR_USERNAME/YOUR_REPO/actions`
+# Server package (luôn tải phiên bản mới nhất):
+https://github.com/USERNAME/REPO_NAME/releases/download/latest/RemotePC-Server.zip
 
-### 3. Trên máy server, chạy lại:
-```cmd
-install_server.bat
-```
+# Client package:
+https://github.com/USERNAME/REPO_NAME/releases/download/latest/RemotePC-Client.zip
+Thay USERNAME và REPO_NAME bằng thông tin GitHub của bạn.
 
-Script sẽ tự động tải và cài bản mới nhất!
+🚀 Cách sử dụng:
+Option 1: Download trực tiếp bằng browser
 
----
-
-## 🛠️ Các Lệnh Có Sẵn
-
-| Command | Mô tả |
-|---------|-------|
-| `build_server.bat` | Build server thành EXE |
-| `package_server.bat` | Build + đóng gói ZIP |
-| `quick_deploy.bat` | Build + host local HTTP server |
-| `install_server.bat` | Auto-download từ GitHub (chạy trên máy server) |
-
----
-
-## 📖 Hướng Dẫn Chi Tiết
-
-Xem: [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)
-
----
-
-## 🆘 Troubleshooting
-
-### ❌ "Permission denied" khi GitHub Actions chạy
-**Fix:**
-1. Repo → Settings → Actions → General
-2. Workflow permissions → **Read and write**
-3. Save
-
-### ❌ "Could not download" khi chạy install_server.bat
-**Fix:**
-1. Đảm bảo repo là **Public**
-2. Hoặc update tên repo trong `install_server.bat`:
-   ```bat
-   set "GITHUB_REPO=YOUR_USERNAME/YOUR_REPO"
-   ```
-
-### ❌ Build fail
-Check build log tại: **Actions** tab trên GitHub
-
----
-
-## 🎯 Workflow Khuyến Nghị
-
-```
-┌─────────────────────────────────────────────┐
-│ 1. Code trên máy dev                        │
-├─────────────────────────────────────────────┤
-│ 2. git push origin main                     │
-├─────────────────────────────────────────────┤
-│ 3. GitHub Actions tự động build & release   │ (2-5 phút)
-├─────────────────────────────────────────────┤
-│ 4. Trên máy server: install_server.bat      │
-└─────────────────────────────────────────────┘
-
-✅ Không cần copy code thủ công
-✅ Không cần build trên máy server
-✅ Luôn có bản backup trên GitHub Releases
-```
-
----
-
-## 🔐 Security
-
-### Firewall rule (chạy 1 lần trên máy server):
-```cmd
-netsh advfirewall firewall add rule name="RemotePC Server" dir=in action=allow protocol=TCP localport=8888
-```
-
-### Repository:
-- **Public**: Ai cũng download được
-- **Private**: Cần Personal Access Token (xem DEPLOYMENT_GUIDE.md)
-
----
-
-## 📊 Sơ Đồ Workflow
-
-```
-┌──────────────────────┐
-│ 1. Code trên máy dev │
-│    (edit Java files) │
-└──────┬───────────────┘
-       │
-       │ git push
-       ▼
-┌────────────────────────────┐
-│ 2. GitHub Actions          │
-│    - Build server.jar      │
-│    - Create EXE            │ (2-5 phút)
-│    - Package ZIP           │
-│    - Create Release        │
-└──────┬─────────────────────┘
-       │
-       │ auto
-       ▼
-┌────────────────────────────┐
-│ 3. GitHub Releases         │
-│    RemotePC-Server.zip     │
-│    (public download)       │
-└──────┬─────────────────────┘
-       │
-       │ install_server.bat
-       ▼
-┌────────────────────────────┐
-│ 4. Server Machine          │
-│    - Download ZIP          │ (30 giây)
-│    - Extract               │
-│    - Run EXE               │
-└────────────────────────────┘
-```
-
----
-
-## 🎉 Lợi Ích
-
-### ❌ Trước đây:
-```
-1. Build trên máy dev (2 phút)
-2. Copy code sang USB (5 phút)
-3. Cắm USB vào server (1 phút)
-4. Copy files (3 phút)
-5. Chạy bat file (1 phút)
----
-TOTAL: ~12 phút
-```
-
-### ✅ Bây giờ:
-```
-1. git push (10 giây)
-2. Đợi build (2-5 phút, tự động)
-3. install_server.bat trên server (30 giây)
----
-TOTAL: ~3 phút, không cần USB, không cần copy thủ công
-```
-
-**Tiết kiệm: 9 phút mỗi lần update!**
-
----
-
-**Hoàn thành checklist = Setup thành công! 🎉**
-
-Save file này và update status khi làm việc.
-Cuối cùng, hãy tạo một visual diagram để giải thích workflow:
-
-Write WORKFLOW_DIAGRAM.txt
-276 lines
-
-═══════════════════════════════════════════════════════════════════════════════
-  REMOTEPC AUTO-DEPLOYMENT WORKFLOW
-═══════════════════════════════════════════════════════════════════════════════
-
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                          PHASE 1: DEVELOPMENT                               │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-    [Developer Machine]
-
-    📝 Edit Code                    ┌──────────────────┐
-    ├─ server/Server.java           │  Your Computer   │
-    ├─ server/ClientHandler.java    │                  │
-    └─ server/WebcamCapture.java    │  Windows/Mac     │
-                                    └──────────────────┘
-                  │
-                  │ git add .
-                  │ git commit -m "Update features"
-                  ▼
-
-    ┌──────────────────────────┐
-    │   Local Git Repository   │
-    │   .git/                  │
-    └──────────────────────────┘
-                  │
-                  │ git push origin main
-                  ▼
-
-═══════════════════════════════════════════════════════════════════════════════
-
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                     PHASE 2: AUTOMATED BUILD (GITHUB)                       │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-    ┌────────────────────────────────────────────────────┐
-    │          🌐 GitHub Repository (Cloud)              │
-    │   https://github.com/YOUR_USERNAME/YOUR_REPO      │
-    └────────────────────────────────────────────────────┘
-                         │
-                         │ Push detected!
-                         │ Trigger: .github/workflows/build-and-release.yml
-                         ▼
-    ┌────────────────────────────────────────────────────┐
-    │          🔧 GitHub Actions (Auto Build)            │
-    │                                                    │
-    │  ┌────────────────────────────────────────────┐   │
-    │  │ Step 1: Checkout Code                      │   │ 30s
-    │  │   - Clone repository                       │   │
-    │  └────────────────────────────────────────────┘   │
-    │               ▼                                    │
-    │  ┌────────────────────────────────────────────┐   │
-    │  │ Step 2: Setup JDK 17                       │   │ 20s
-    │  │   - Download & configure Java              │   │
-    │  └────────────────────────────────────────────┘   │
-    │               ▼                                    │
-    │  ┌────────────────────────────────────────────┐   │
-    │  │ Step 3: Build Server                       │   │ 60s
-    │  │   - Compile: javac *.java                  │   │
-    │  │   - Create JAR: jar cfm server.jar         │   │
-    │  │   - Package EXE: jpackage                  │   │
-    │  └────────────────────────────────────────────┘   │
-    │               ▼                                    │
-    │  ┌────────────────────────────────────────────┐   │
-    │  │ Step 4: Create Deployment Package          │   │ 30s
-    │  │   - Copy EXE + dependencies                │   │
-    │  │   - Bundle FFmpeg (if exists)              │   │
-    │  │   - Create ZIP archive                     │   │
-    │  └────────────────────────────────────────────┘   │
-    │               ▼                                    │
-    │  ┌────────────────────────────────────────────┐   │
-    │  │ Step 5: Create GitHub Release              │   │ 20s
-    │  │   - Tag: v1.0.{build_number}               │   │
-    │  │   - Upload: RemotePC-Server.zip            │   │
-    │  │   - Generate release notes                 │   │
-    │  └────────────────────────────────────────────┘   │
-    │                                                    │
-    │  Total Time: ~2-5 minutes                         │
-    └────────────────────────────────────────────────────┘
-                         │
-                         │ Build Success ✅
-                         ▼
-    ┌────────────────────────────────────────────────────┐
-    │          📦 GitHub Releases                        │
-    │                                                    │
-    │  v1.0.1  ◄── Latest                               │
-    │    └─ RemotePC-Server.zip (85 MB)                 │
-    │                                                    │
-    │  v1.0.2  ◄── Previous                             │
-    │    └─ RemotePC-Server.zip (85 MB)                 │
-    │                                                    │
-    │  Public download link:                            │
-    │  https://github.com/.../releases/latest           │
-    └────────────────────────────────────────────────────┘
-
-═══════════════════════════════════════════════════════════════════════════════
-
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    PHASE 3: SERVER INSTALLATION                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-    [Target Server Machine]
-
-    ┌──────────────────────────────────────┐
-    │   Windows 10/11 PC                   │
-    │   (Máy cần điều khiển)               │
-    └──────────────────────────────────────┘
-              │
-              │ User runs ONE command:
-              │ curl -L -o install.bat https://raw.githubusercontent.com/.../install_server.bat && install.bat
-              ▼
-    ┌────────────────────────────────────────────────────┐
-    │     🔽 install_server.bat (Auto-Installer)         │
-    │                                                    │
-    │  ┌────────────────────────────────────────────┐   │
-    │  │ 1. Download Latest Release                 │   │
-    │  │    - Query GitHub API                      │   │
-    │  │    - Get RemotePC-Server.zip URL           │   │
-    │  └────────────────────────────────────────────┘   │
-    │               ▼                                    │
-    │  ┌────────────────────────────────────────────┐   │
-    │  │ 2. Extract Files                           │   │
-    │  │    - Unzip to: C:\Users\{user}\RemotePC    │   │
-    │  │    - Preserve folder structure             │   │
-    │  └────────────────────────────────────────────┘   │
-    │               ▼                                    │
-    │  ┌────────────────────────────────────────────┐   │
-    │  │ 3. Create Desktop Shortcut                 │   │
-    │  │    - Icon: RemotePC Server.lnk             │   │
-    │  └────────────────────────────────────────────┘   │
-    │               ▼                                    │
-    │  ┌────────────────────────────────────────────┐   │
-    │  │ 4. Launch Server (Optional)                │   │
-    │  │    - Start RemotePC-Server.exe             │   │
-    │  └────────────────────────────────────────────┘   │
-    │                                                    │
-    │  Total Time: ~30 seconds                          │
-    └────────────────────────────────────────────────────┘
-              │
-              ▼
-    ┌──────────────────────────────────────┐
-    │   ✅ Server Running                  │
-    │                                      │
-    │   [RemotePC-Server.exe]              │
-    │                                      │
-    │   Listening on: 0.0.0.0:8888         │
-    │   Status: Ready for connections      │
-    └──────────────────────────────────────┘
-
-═══════════════════════════════════════════════════════════════════════════════
-
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    PHASE 4: CLIENT CONNECTION                               │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-    [Control Machine]
-
-    ┌──────────────────────────────────────┐
-    │   Your Computer                      │
-    │   (Máy điều khiển)                   │
-    └──────────────────────────────────────┘
-              │
-              │ Run: RemotePC-Client.exe
-              ▼
-    ┌──────────────────────────────────────┐
-    │   Client GUI                         │
-    │   ┌────────────────────────────┐     │
-    │   │ Server IP: 192.168.1.100   │     │
-    │   │ Port: 8888                 │     │
-    │   │                            │     │
-    │   │ [Connect] ◄── Click here   │     │
-    │   └────────────────────────────┘     │
-    └──────────────────────────────────────┘
-              │
-              │ TCP Socket Connection
-              │ Port: 8888
-              ▼
-
-    ═══════════════════════════════════════
-    ║   🔌 CONNECTED!                     ║
-    ║                                     ║
-    ║   Client ◄──────────────────► Server
-    ║   (Your PC)        LAN       (Target)
-    ═══════════════════════════════════════
-              │
-              │ Send commands
-              ▼
-
-    Client sends:                Server executes:
-    ┌──────────────────┐         ┌────────────────────┐
-    │ LIST_APPS        │────────►│ PowerShell query   │
-    ├──────────────────┤         ├────────────────────┤
-    │ SCREENSHOT       │────────►│ Robot capture      │
-    ├──────────────────┤         ├────────────────────┤
-    │ SHUTDOWN         │────────►│ shutdown /s /t 0   │
-    └──────────────────┘         └────────────────────┘
-
-═══════════════════════════════════════════════════════════════════════════════
-
-                        🔄 UPDATE CYCLE
-
-    When you update code:
-
-    Developer                GitHub              Server
-    ════════                ══════              ══════
-
-    Edit code      ──►    Detect push    ──►   Wait...
-       │                       │
-    git push       ──►    Auto build     ──►   Wait...
-       │                       │                    │
-    Wait...               Create release ──►   install_server.bat
-       │                       │                    │
-    Done! ✅              Done! ✅              Updated! ✅
-
-    ⏱️  Total: ~3 minutes (mostly automated)
-
-═══════════════════════════════════════════════════════════════════════════════
-
-                    📊 COMPARISON: BEFORE vs AFTER
-
-    ╔═══════════════════════════╤═══════════════════════════╗
-    ║       BEFORE (Manual)     │     AFTER (Automated)     ║
-    ╠═══════════════════════════╪═══════════════════════════╣
-    ║ 1. Edit code              │ 1. Edit code              ║
-    ║ 2. Run build_server.bat   │ 2. git push               ║
-    ║ 3. Wait for build (2 min) │ 3. Wait (auto, 3 min)     ║
-    ║ 4. Find USB drive         │ 4. Run install on server  ║
-    ║ 5. Copy files to USB      │ 5. Done! ✅                ║
-    ║ 6. Walk to server PC      │                           ║
-    ║ 7. Plug in USB            │                           ║
-    ║ 8. Copy files from USB    │                           ║
-    ║ 9. Run bat file           │                           ║
-    ║ 10. Test                  │                           ║
-    ╠═══════════════════════════╪═══════════════════════════╣
-    ║ Time: ~15 minutes         │ Time: ~4 minutes          ║
-    ║ Steps: 10                 │ Steps: 4                  ║
-    ║ Manual work: High         │ Manual work: Low          ║
-    ║ Error-prone: Yes          │ Error-prone: No           ║
-    ║ Rollback: Difficult       │ Rollback: Easy            ║
-    ╚═══════════════════════════╧═══════════════════════════╝
-
-═══════════════════════════════════════════════════════════════════════════════
-
-                    🎯 KEY BENEFITS
-
-    ✅ No manual file copying
-    ✅ No USB drive needed
-    ✅ No walking between computers
-    ✅ Version history on GitHub
-    ✅ Easy rollback to previous versions
-    ✅ Automatic builds (set and forget)
-    ✅ Professional workflow
-    ✅ Can deploy to multiple servers easily
-
-═══════════════════════════════════════════════════════════════════════════════
-
-                    🔧 SCRIPTS CREATED
-
-    test_deployment.bat     - Verify environment setup
-    setup_repo.bat          - Configure GitHub repository
-    package_server.bat      - Manual packaging (backup method)
-    quick_deploy.bat        - Fast local LAN deployment
-    install_server.bat      - Auto-installer for server (run on target)
-
-═══════════════════════════════════════════════════════════════════════════════
-
-                    📚 DOCUMENTATION
-
-    QUICKSTART.md           - 5-minute setup guide
-    DEPLOYMENT_GUIDE.md     - Detailed instructions
-    SETUP_CHECKLIST.md      - Step-by-step checklist
-    README_DEPLOYMENT.md    - Quick reference
-    WORKFLOW_DIAGRAM.txt    - This file
-
-═══════════════════════════════════════════════════════════════════════════════
+https://github.com/chungdo/nhap_mon_lap_trinh_v1/releases/download/latest/RemotePC-Server.zip
+Option 2: Download bằng wget/curl (trong script)
+Tôi sẽ tạo script tự động download và deploy cho bạn.
