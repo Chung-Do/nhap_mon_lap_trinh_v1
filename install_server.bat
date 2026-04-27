@@ -41,34 +41,40 @@ echo [2/5] Downloading latest version from GitHub...
 echo      URL: %DOWNLOAD_URL%
 echo.
 
-REM Xóa file cũ nếu có
-if exist "%TEMP_ZIP%" del /q "%TEMP_ZIP%" 2>nul
+REM Download với curl - auto retry và resume
+set "RETRY_COUNT=0"
+:download_retry
 
-REM Download với progress bar chi tiết
+if %RETRY_COUNT% GTR 0 (
+    echo      Retry attempt %RETRY_COUNT%/3...
+    timeout /t 3 /nobreak >nul
+)
+
+REM -#: progress bar 1 dòng
 REM -L: follow redirects
-REM -o: output file
-REM --fail: fail silently on HTTP errors
-REM --connect-timeout 10: timeout nếu không kết nối được trong 10s
-REM --max-time 600: timeout nếu tổng thời gian > 10 phút
-REM -#: progress bar
-
-echo      Connecting to GitHub...
-curl -L -o "%TEMP_ZIP%" "%DOWNLOAD_URL%" --fail --connect-timeout 10 --max-time 600 -#
+REM -C -: resume nếu bị ngắt
+curl -# -L -C - -o "%TEMP_ZIP%" "%DOWNLOAD_URL%" --connect-timeout 15 --retry 3 --retry-delay 3
 
 if errorlevel 1 (
+    set /a RETRY_COUNT+=1
+    if %RETRY_COUNT% LEQ 3 (
+        echo      Retrying from where it stopped...
+        goto download_retry
+    )
+
     echo.
-    echo [ERROR] Download failed!
+    echo [ERROR] Download failed after 3 attempts!
     echo.
     echo Possible reasons:
-    echo   1. Network connection issue (check your internet)
-    echo   2. GitHub release not found (check: https://github.com/%GITHUB_REPO%/releases/tag/latest)
-    echo   3. Repository is private (make it public)
-    echo   4. Connection timeout (slow network or server issue)
+    echo   1. Unstable network connection
+    echo   2. GitHub release not found: https://github.com/%GITHUB_REPO%/releases/tag/latest
+    echo   3. Firewall/Antivirus blocking download
     echo.
     echo Troubleshooting:
-    echo   - Try opening the URL in browser to verify it exists
-    echo   - Check if you can access github.com
-    echo   - Wait a few minutes and try again
+    echo   1. Open URL in browser: %DOWNLOAD_URL%
+    echo   2. Check internet: ping github.com
+    echo   3. Try again in a few minutes
+    echo   4. Download manually and extract to: %INSTALL_DIR%
     echo.
     pause
     exit /b 1
