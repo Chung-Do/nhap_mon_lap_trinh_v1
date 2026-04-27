@@ -41,19 +41,26 @@ echo [2/5] Downloading latest version from GitHub...
 echo      URL: %DOWNLOAD_URL%
 echo.
 
-REM Download với curl - auto retry và resume
+REM Xóa file cũ trước khi download (tránh corrupt)
+if exist "%TEMP_ZIP%" (
+    echo      Removing old download file...
+    del /f /q "%TEMP_ZIP%" 2>nul
+)
+
+REM Download với curl - auto retry (KHÔNG resume vì ZIP dễ corrupt)
 set "RETRY_COUNT=0"
 :download_retry
 
 if %RETRY_COUNT% GTR 0 (
-    echo      Retry attempt %RETRY_COUNT%/3...
+    echo      Download failed. Retry attempt %RETRY_COUNT%/3...
+    del /f /q "%TEMP_ZIP%" 2>nul
     timeout /t 3 /nobreak >nul
 )
 
 REM -#: progress bar 1 dòng
 REM -L: follow redirects
-REM -C -: resume nếu bị ngắt
-curl -# -L -C - -o "%TEMP_ZIP%" "%DOWNLOAD_URL%" --connect-timeout 15 --retry 3 --retry-delay 3
+REM KHÔNG dùng -C - vì ZIP file dễ bị corrupt khi resume
+curl -# -L -o "%TEMP_ZIP%" "%DOWNLOAD_URL%" --connect-timeout 15 --retry 3 --retry-delay 3
 
 if errorlevel 1 (
     set /a RETRY_COUNT+=1
@@ -80,19 +87,48 @@ if errorlevel 1 (
     exit /b 1
 )
 
+REM Kiểm tra file download có thành công không
+if not exist "%TEMP_ZIP%" (
+    echo.
+    echo [ERROR] Download file not found!
+    pause
+    exit /b 1
+)
+
 REM Kiểm tra file size
 for %%A in ("%TEMP_ZIP%") do set "FILESIZE=%%~zA"
 if %FILESIZE% LSS 1000000 (
     echo.
-    echo [WARNING] Downloaded file is suspiciously small (^<%FILESIZE% bytes^)
-    echo           This might not be the correct file.
+    echo [ERROR] Downloaded file too small (%FILESIZE% bytes)
+    echo         File may be corrupt or not the correct file.
+    echo         Expected: ~80-100 MB
     echo.
-    echo Press any key to continue anyway, or Ctrl+C to cancel...
-    pause >nul
+    echo Deleting corrupt file and exiting...
+    del /f /q "%TEMP_ZIP%" 2>nul
+    pause
+    exit /b 1
+)
+
+REM Test ZIP integrity trước khi extract
+echo      Verifying ZIP file integrity...
+tar -tzf "%TEMP_ZIP%" >nul 2>&1
+if errorlevel 1 (
+    echo.
+    echo [ERROR] ZIP file is corrupted!
+    echo         The downloaded file cannot be extracted.
+    echo.
+    echo Possible solutions:
+    echo   1. Delete and run this script again
+    echo   2. Check your network connection
+    echo   3. Download manually from: %DOWNLOAD_URL%
+    echo.
+    del /f /q "%TEMP_ZIP%" 2>nul
+    pause
+    exit /b 1
 )
 
 echo.
-echo      Download complete!
+echo      Download complete! (File size: %FILESIZE% bytes)
 
 REM --- 4. Giải nén ---
 echo [3/5] Extracting files...
