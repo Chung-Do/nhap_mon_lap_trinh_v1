@@ -1,21 +1,27 @@
-  RemotePC Server - Auto Installer
-===================================================
-
 [WARN] Not running as Administrator
        Some features may not work properly
 
 [1/5] Creating installation directory...
      Directory exists: C:\Users\workw\RemotePC
 [2/5] Downloading latest version from GitHub...
-     URL: https://github.com/Chung-Do/nhap_mon_lap_trinh_v1/releases/download/latest/RemotePC-Server.zip
+     URL: https://github.com/Chung-Do/nhap_mon_lap_trinh_v1/releases/latest/download/RemotePC-Server.zip
 
+     Removing old download file...
 ################################################################################################################ 100.0%
+
+[ERROR] Downloaded file too small (215 bytes
         File may be corrupt or not the correct file.
         Expected: ~80-100 MB
 
-Deleting corrupt file and exiting...
-Press any key to continue . . .
+Common causes:
+  1. GitHub release tag 'latest' does not exist
+  2. File 'RemotePC-Server.zip' not found in release
+  3. GitHub returned a 404 error page instead of the file
 
+Please check your GitHub release:
+  https://github.com/Chung-Do/nhap_mon_lap_trinh_v1/releases
 
+The downloaded file will be kept for inspection at:
+  C:\Users\workw\AppData\Local\Temp\RemotePC-Server.zip
 
-
+You can open it in Notepad to see what was actually downloaded.
