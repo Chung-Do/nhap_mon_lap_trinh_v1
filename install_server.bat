@@ -10,7 +10,8 @@ REM --- Configuration ---
 set "GITHUB_REPO=Chung-Do/nhap_mon_lap_trinh_v1"
 set "INSTALL_DIR=%USERPROFILE%\RemotePC"
 set "TEMP_ZIP=%TEMP%\RemotePC-Server.zip"
-set "DOWNLOAD_URL=https://github.com/%GITHUB_REPO%/releases/latest/download/RemotePC-Server.zip"
+REM Use direct download link (more reliable than tag-based URL)
+set "DOWNLOAD_URL=https://github.com/%GITHUB_REPO%/releases/download/latest/RemotePC-Server.zip"
 
 echo ===================================================
 echo   RemotePC Server - Auto Installer
