@@ -1,6 +1,11 @@
 # Build artifacts
 build/
 dist/
+server_deploy/
+
+# Deployment packages
+*.zip
+RemotePC-Server.zip
 
 # Java compiled files
 *.class
@@ -13,3 +18,7 @@ dist/
 # FFmpeg binary (too large for git)
 resources/ffmpeg/ffmpeg.exe
 ffmpeg_bundle/
+
+# Deployment temp files
+index.html
+version.txt
