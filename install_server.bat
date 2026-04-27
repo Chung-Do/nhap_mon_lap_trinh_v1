@@ -10,7 +10,7 @@ REM --- Configuration ---
 set "GITHUB_REPO=Chung-Do/nhap_mon_lap_trinh_v1"
 set "INSTALL_DIR=%USERPROFILE%\RemotePC"
 set "TEMP_ZIP=%TEMP%\RemotePC-Server.zip"
-set "DOWNLOAD_URL=https://github.com/%GITHUB_REPO%/releases/download/latest/RemotePC-Server.zip"
+set "DOWNLOAD_URL=https://github.com/%GITHUB_REPO%/releases/latest/download/RemotePC-Server.zip"
 
 echo ===================================================
 echo   RemotePC Server - Auto Installer
@@ -103,8 +103,19 @@ if %FILESIZE% LSS 1000000 (
     echo         File may be corrupt or not the correct file.
     echo         Expected: ~80-100 MB
     echo.
-    echo Deleting corrupt file and exiting...
-    del /f /q "%TEMP_ZIP%" 2>nul
+    echo Common causes:
+    echo   1. GitHub release tag 'latest' does not exist
+    echo   2. File 'RemotePC-Server.zip' not found in release
+    echo   3. GitHub returned a 404 error page instead of the file
+    echo.
+    echo Please check your GitHub release:
+    echo   https://github.com/%GITHUB_REPO%/releases
+    echo.
+    echo The downloaded file will be kept for inspection at:
+    echo   %TEMP_ZIP%
+    echo.
+    echo You can open it in Notepad to see what was actually downloaded.
+    echo.
     pause
     exit /b 1
 )
