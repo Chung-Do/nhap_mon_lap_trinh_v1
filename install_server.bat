@@ -10,6 +10,7 @@ REM --- Configuration ---
 set "GITHUB_REPO=Chung-Do/nhap_mon_lap_trinh_v1"
 set "INSTALL_DIR=%USERPROFILE%\RemotePC"
 set "TEMP_ZIP=%TEMP%\RemotePC-Server.zip"
+set "DOWNLOAD_URL=https://github.com/%GITHUB_REPO%/releases/download/latest/RemotePC-Server.zip"
 
 echo ===================================================
 echo   RemotePC Server - Auto Installer
@@ -37,31 +38,35 @@ if not exist "%INSTALL_DIR%" (
 
 REM --- 3. Tải phiên bản mới nhất từ GitHub ---
 echo [2/5] Downloading latest version from GitHub...
+echo      URL: %DOWNLOAD_URL%
 echo      Please wait...
 
-REM Download trực tiếp từ release "latest"
-set "DOWNLOAD_URL=https://github.com/%GITHUB_REPO%/releases/download/latest/RemotePC-Server.zip"
-
-echo      Downloading from: %DOWNLOAD_URL%
-
-powershell -ExecutionPolicy Bypass -Command "try { Invoke-WebRequest -Uri '%DOWNLOAD_URL%' -OutFile '%TEMP_ZIP%' -UseBasicParsing -ErrorAction Stop; $sizeMB = [math]::Round((Get-Item '%TEMP_ZIP%').Length / 1MB, 2); Write-Host '      Download complete!' $sizeMB 'MB' -ForegroundColor Green; exit 0 } catch { Write-Host '      ERROR: Failed to download.' -ForegroundColor Red; Write-Host '      ' $_.Exception.Message -ForegroundColor Yellow; exit 1 }"
+curl -L -o "%TEMP_ZIP%" "%DOWNLOAD_URL%" --progress-bar --fail --silent --show-error
 
 if errorlevel 1 (
     echo.
     echo [ERROR] Download failed!
     echo         - Check your internet connection
-    echo         - Make sure GitHub repository is public
-    echo         - Verify repository name: %GITHUB_REPO%
-    echo         - Check if release exists: https://github.com/%GITHUB_REPO%/releases/tag/latest
+    echo         - Verify release exists: https://github.com/%GITHUB_REPO%/releases/tag/latest
+    echo         - Make sure repository is public
     echo.
     pause
     exit /b 1
 )
 
+echo      Download complete!
+
 REM --- 4. Giải nén ---
 echo [3/5] Extracting files...
 
-powershell -ExecutionPolicy Bypass -Command "try { Expand-Archive -Path '%TEMP_ZIP%' -DestinationPath '%INSTALL_DIR%' -Force -ErrorAction Stop; Write-Host '      Extracted successfully!' -ForegroundColor Green; exit 0 } catch { Write-Host '      ERROR: Failed to extract ZIP' -ForegroundColor Red; Write-Host '      ' $_.Exception.Message; exit 1 }"
+REM Xóa folder cũ nếu có để tránh conflict
+if exist "%INSTALL_DIR%\RemotePC-Server" (
+    echo      Removing old installation...
+    rmdir /s /q "%INSTALL_DIR%\RemotePC-Server" 2>nul
+)
+
+REM Extract bằng tar (có sẵn trên Windows 10+)
+tar -xf "%TEMP_ZIP%" -C "%INSTALL_DIR%"
 
 if errorlevel 1 (
     echo [ERROR] Extraction failed!
@@ -69,15 +74,27 @@ if errorlevel 1 (
     exit /b 1
 )
 
+echo      Extracted successfully!
+
 REM --- 5. Dọn dẹp file tạm ---
 echo [4/5] Cleaning up...
 if exist "%TEMP_ZIP%" del /q "%TEMP_ZIP%"
 echo      Temporary files removed.
 
-REM --- 6. Tạo shortcut (optional) ---
+REM --- 6. Tạo shortcut ---
 echo [5/5] Creating shortcuts...
 
-powershell -ExecutionPolicy Bypass -Command "$WshShell = New-Object -ComObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut('%USERPROFILE%\Desktop\RemotePC Server.lnk'); $Shortcut.TargetPath = '%INSTALL_DIR%\RemotePC-Server\RemotePC-Server.exe'; $Shortcut.WorkingDirectory = '%INSTALL_DIR%\RemotePC-Server'; $Shortcut.Description = 'RemotePC Server'; $Shortcut.Save();"
+REM Tạo VBS script để tạo shortcut (không cần PowerShell)
+echo Set oWS = WScript.CreateObject("WScript.Shell") > "%TEMP%\CreateShortcut.vbs"
+echo sLinkFile = "%USERPROFILE%\Desktop\RemotePC Server.lnk" >> "%TEMP%\CreateShortcut.vbs"
+echo Set oLink = oWS.CreateShortcut(sLinkFile) >> "%TEMP%\CreateShortcut.vbs"
+echo oLink.TargetPath = "%INSTALL_DIR%\RemotePC-Server\RemotePC-Server.exe" >> "%TEMP%\CreateShortcut.vbs"
+echo oLink.WorkingDirectory = "%INSTALL_DIR%\RemotePC-Server" >> "%TEMP%\CreateShortcut.vbs"
+echo oLink.Description = "RemotePC Server" >> "%TEMP%\CreateShortcut.vbs"
+echo oLink.Save >> "%TEMP%\CreateShortcut.vbs"
+
+cscript //nologo "%TEMP%\CreateShortcut.vbs"
+del "%TEMP%\CreateShortcut.vbs" 2>nul
 
 echo      Desktop shortcut created!
 
