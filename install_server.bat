@@ -48,41 +48,32 @@ if exist "%TEMP_ZIP%" (
     del /f /q "%TEMP_ZIP%" 2>nul
 )
 
-REM Download với curl - auto retry (KHÔNG resume vì ZIP dễ corrupt)
-set "RETRY_COUNT=0"
-:download_retry
-
-if %RETRY_COUNT% GTR 0 (
-    echo      Download failed. Retry attempt %RETRY_COUNT%/3...
-    del /f /q "%TEMP_ZIP%" 2>nul
-    timeout /t 3 /nobreak >nul
-)
-
-REM -#: progress bar 1 dòng
+REM Download with curl - single attempt with extended timeout for large files
 REM -L: follow redirects
-REM KHÔNG dùng -C - vì ZIP file dễ bị corrupt khi resume
-curl -# -L -o "%TEMP_ZIP%" "%DOWNLOAD_URL%" --connect-timeout 15 --retry 3 --retry-delay 3
+REM --progress-bar: show progress with speed and time remaining
+REM --connect-timeout 15: 15 seconds to establish connection
+REM --max-time 300: 5 minute timeout (for ~80-100MB file)
+REM --retry 5: retry 5 times on transient errors
+REM --retry-delay 5: wait 5 seconds between retries
+REM --retry-max-time 750: maximum 12.5 minutes total for all retries
+curl -L -o "%TEMP_ZIP%" "%DOWNLOAD_URL%" --connect-timeout 15 --max-time 300 --retry 5 --retry-delay 5 --retry-max-time 750
 
 if errorlevel 1 (
-    set /a RETRY_COUNT+=1
-    if %RETRY_COUNT% LEQ 3 (
-        echo      Retrying from where it stopped...
-        goto download_retry
-    )
-
     echo.
-    echo [ERROR] Download failed after 3 attempts!
+    echo [ERROR] Download failed!
     echo.
     echo Possible reasons:
-    echo   1. Unstable network connection
-    echo   2. GitHub release not found: https://github.com/%GITHUB_REPO%/releases/tag/latest
+    echo   1. Unstable network connection (file is ~80-100MB)
+    echo   2. GitHub release not found or file not uploaded properly
     echo   3. Firewall/Antivirus blocking download
+    echo   4. Network timeout (slow connection)
     echo.
     echo Troubleshooting:
-    echo   1. Open URL in browser: %DOWNLOAD_URL%
+    echo   1. Test URL in browser: %DOWNLOAD_URL%
     echo   2. Check internet: ping github.com
-    echo   3. Try again in a few minutes
-    echo   4. Download manually and extract to: %INSTALL_DIR%
+    echo   3. Try from a different network
+    echo   4. Download manually from: https://github.com/%GITHUB_REPO%/releases
+    echo      Then extract to: %INSTALL_DIR%
     echo.
     pause
     exit /b 1
