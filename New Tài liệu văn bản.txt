@@ -1,0 +1,21 @@
+===================================================
+  RemotePC Server - Auto Installer
+===================================================
+
+[WARN] Not running as Administrator
+       Some features may not work properly
+
+[1/5] Creating installation directory...
+     Directory exists: C:\Users\workw\RemotePC
+[2/5] Downloading latest version from GitHub...
+     URL: https://github.com/Chung-Do/nhap_mon_lap_trinh_v1/releases/download/latest/RemotePC-Server.zip
+
+################################################################################################################ 100.0%
+
+     Download complete
+[3/5] Extracting files...
+tar: Inconsistent compressed size: 54448 in central directory, 54426 in local header
+tar: Damaged Zip archive
+tar: Error exit delayed from previous errors.
+[ERROR] Extraction failed
+Press any key to continue . . .
