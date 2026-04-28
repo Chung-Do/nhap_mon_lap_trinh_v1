@@ -321,14 +321,12 @@ public class WebcamCapture {
                     break;
             }
 
-            // SIMPLE FFmpeg command - NO scale filter (causes delay!)
+            // SIMPLE FFmpeg command - Let FFmpeg auto-detect (no probe limits)
             ProcessBuilder pb = new ProcessBuilder(
                 ffmpeg,
                 "-f", "dshow",
                 "-video_size", resolution,
-                "-rtbufsize", "1M",
-                "-probesize", "32",
-                "-analyzeduration", "0",
+                "-rtbufsize", "5M",
                 "-fflags", "nobuffer",
                 "-i", "video=" + cameraName,
                 "-frames:v", "1",
@@ -336,6 +334,7 @@ public class WebcamCapture {
                 "-pix_fmt", "yuvj420p",
                 "-y", tmpFile
             );
+            System.out.println("[WEBCAM] Command: " + String.join(" ", pb.command()));
             pb.redirectErrorStream(true);
 
             System.out.println("[WEBCAM TIMING] Starting FFmpeg...");
