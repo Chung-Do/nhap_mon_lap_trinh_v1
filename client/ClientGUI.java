@@ -863,94 +863,129 @@ public class ClientGUI extends JFrame {
         webcamStreamStartBtn.setEnabled(false);
         webcamStreamStopBtn.setEnabled(true);
         startRecordBtn.setEnabled(false); // Disable record khi dang stream
-        webcamStreamFpsLabel.setText("  Starting..."); // Show immediate feedback
+        webcamStreamFpsLabel.setText("  Starting stream..."); // Show immediate feedback
         log("Bat dau stream webcam... (Quality: " + quality + ")");
 
-        // Adjust timer based on quality (lower quality = faster FPS possible)
-        // Balanced intervals for smooth streaming
-        int timerDelay = quality.equals("low") ? 66 : (quality.equals("medium") ? 100 : 150);
-        // 66ms = ~15 FPS, 100ms = 10 FPS, 150ms = 6-7 FPS
+        // Start stream on server first
+        socketExec.submit(() -> {
+            try {
+                // Send START_STREAM command
+                conn.sendCommand(JsonUtil.buildCommand("WEBCAM_START_STREAM", "camera", cameraName, "quality", quality));
+                String response = conn.readTextResponse();
+                String data = extract(response);
 
-        // Khoi dong timer
-        SwingUtilities.invokeLater(() -> {
-            final long[] lastT = {System.currentTimeMillis()};
-            final int[] skipCount = {0};
-            final int[] frameCount = {0};
-            webcamStreamTimer = new Timer(timerDelay, ev -> {
-                if (webcamStreamBusy.get()) {
-                    skipCount[0]++;
-                    if (skipCount[0] % 10 == 0) { // Log every 10 skips
-                        System.out.println("[STREAM] SKIPPED " + skipCount[0] + " frames (busy)");
-                        // Update UI to show we're waiting
-                        SwingUtilities.invokeLater(() -> {
-                            webcamStreamFpsLabel.setText("  Waiting... (" + skipCount[0] + " skipped)");
-                        });
-                    }
+                if (!response.contains("\"OK\"")) {
+                    // Error starting stream
+                    SwingUtilities.invokeLater(() -> {
+                        showErr("Khong the bat dau stream:\n" + data);
+                        stopWebcamStream();
+                    });
                     return;
                 }
-                webcamStreamBusy.set(true);
-                final long requestStart = System.currentTimeMillis();
 
-                // Show "Capturing..." feedback
-                if (frameCount[0] == 0) {
-                    SwingUtilities.invokeLater(() -> {
-                        webcamStreamFpsLabel.setText("  Capturing first frame...");
-                    });
-                }
-                socketExec.submit(() -> {
-                    try {
-                        conn.sendCommand(JsonUtil.buildCommand("WEBCAM_CAPTURE", "camera", cameraName, "quality", quality));
-                        final long t1 = System.currentTimeMillis();
+                log("Server started stream: " + data);
 
-                        String marker = conn.readTextResponse();
-                        final long t2 = System.currentTimeMillis();
+                // Adjust timer based on quality for optimal FPS
+                int timerDelay = quality.equals("low") ? 66 : (quality.equals("medium") ? 100 : 150);
+                // 66ms = ~15 FPS, 100ms = 10 FPS, 150ms = 6-7 FPS
 
-                        if ("BINARY".equals(marker)) {
-                            byte[] data = conn.readBinaryData();
-                            final long t3 = System.currentTimeMillis();
+                // Now start polling for frames
+                SwingUtilities.invokeLater(() -> {
+                    final long[] lastT = {System.currentTimeMillis()};
+                    final int[] frameCount = {0};
 
-                            BufferedImage img = ImageIO.read(new ByteArrayInputStream(data));
-                            final long t4 = System.currentTimeMillis();
-
-                            if (img != null) {
-                                webcamStreamImage = img;
-                                frameCount[0]++;
-                                final long now = System.currentTimeMillis();
-                                final long totalTime = now - requestStart;
-                                String fps = String.format("%.1f", 1000.0 / (now - lastT[0]));
-                                lastT[0] = now;
-
-                                // Simplified logging
-                                System.out.println("[STREAM] Frame #" + frameCount[0] + " - " + totalTime + "ms total, FPS: " + fps +
-                                    " (server:" + (t2-t1) + "ms, net:" + (t3-t2) + "ms, decode:" + (t4-t3) + "ms)");
-
-                                final int currentFrame = frameCount[0];
-                                SwingUtilities.invokeLater(() -> {
-                                    webcamStreamPanel.repaint();
-                                    webcamStreamFpsLabel.setText("  FPS: " + fps + " [#" + currentFrame + "]");
-                                });
-                            }
+                    webcamStreamTimer = new Timer(timerDelay, ev -> {
+                        if (webcamStreamBusy.get()) {
+                            return; // Skip this frame if still processing
                         }
-                    } catch (Exception ex) {
-                        System.err.println("[STREAM] ERROR: " + ex.getMessage());
-                        log("LOI webcam stream: " + ex.getMessage());
-                        SwingUtilities.invokeLater(() -> stopWebcamStream());
-                    } finally {
-                        webcamStreamBusy.set(false);
-                    }
+                        webcamStreamBusy.set(true);
+
+                        socketExec.submit(() -> {
+                            try {
+                                long t1 = System.currentTimeMillis();
+
+                                // Get current frame from stream
+                                conn.sendCommand(JsonUtil.buildCommand("WEBCAM_GET_FRAME"));
+                                String marker = conn.readTextResponse();
+
+                                long t2 = System.currentTimeMillis();
+
+                                if ("BINARY".equals(marker)) {
+                                    byte[] frameData = conn.readBinaryData();
+                                    long t3 = System.currentTimeMillis();
+
+                                    BufferedImage img = ImageIO.read(new ByteArrayInputStream(frameData));
+                                    long t4 = System.currentTimeMillis();
+
+                                    if (img != null) {
+                                        webcamStreamImage = img;
+                                        frameCount[0]++;
+
+                                        long now = System.currentTimeMillis();
+                                        long totalTime = now - t1;
+                                        String fps = String.format("%.1f", 1000.0 / (now - lastT[0]));
+                                        lastT[0] = now;
+
+                                        System.out.println("[STREAM] Frame #" + frameCount[0] + " - " + totalTime + "ms " +
+                                            "(cmd:" + (t2-t1) + "ms, net:" + (t3-t2) + "ms, decode:" + (t4-t3) + "ms), FPS: " + fps);
+
+                                        final int currentFrame = frameCount[0];
+                                        final String currentFps = fps;
+                                        SwingUtilities.invokeLater(() -> {
+                                            webcamStreamPanel.repaint();
+                                            webcamStreamFpsLabel.setText("  FPS: " + currentFps + " [#" + currentFrame + "]");
+                                        });
+                                    }
+                                } else {
+                                    // Frame not ready or error - just skip
+                                    System.out.println("[STREAM] Frame not ready");
+                                }
+                            } catch (Exception ex) {
+                                System.err.println("[STREAM] ERROR: " + ex.getMessage());
+                                log("LOI webcam stream: " + ex.getMessage());
+                                SwingUtilities.invokeLater(() -> stopWebcamStream());
+                            } finally {
+                                webcamStreamBusy.set(false);
+                            }
+                        });
+                    });
+
+                    webcamStreamTimer.start();
+                    log("Webcam stream timer started");
                 });
-            });
-            webcamStreamTimer.start();
-            log("Webcam stream da bat dau");
+
+            } catch (Exception ex) {
+                System.err.println("[STREAM] ERROR starting stream: " + ex.getMessage());
+                log("LOI bat dau stream: " + ex.getMessage());
+                SwingUtilities.invokeLater(() -> {
+                    showErr("Khong the bat dau stream:\n" + ex.getMessage());
+                    stopWebcamStream();
+                });
+            }
         });
     }
 
     private void stopWebcamStream() {
+        // Stop timer first
         if (webcamStreamTimer != null) {
             webcamStreamTimer.stop();
             webcamStreamTimer = null;
         }
         webcamStreamBusy.set(false);
+
+        // Send stop command to server
+        if (conn.isConnected()) {
+            socketExec.submit(() -> {
+                try {
+                    conn.sendCommand(JsonUtil.buildCommand("WEBCAM_STOP_STREAM"));
+                    conn.readTextResponse(); // Consume response
+                    log("Server stopped stream");
+                } catch (Exception e) {
+                    System.err.println("[STREAM] Error stopping stream: " + e.getMessage());
+                }
+            });
+        }
+
         SwingUtilities.invokeLater(() -> {
             webcamStreamStartBtn.setEnabled(true);
             webcamStreamStopBtn.setEnabled(false);

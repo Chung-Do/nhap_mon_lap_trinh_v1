@@ -132,6 +132,20 @@ public class ClientHandler implements Runnable {
                 WebcamCapture.stopRecording(out);
                 break;
 
+            // ── Webcam Stream (New High-FPS approach) ──
+            case "WEBCAM_START_STREAM":
+                String cameraStream = JsonUtil.extractValue(json, "camera");
+                String qualityStream = JsonUtil.extractValue(json, "quality");
+                if (qualityStream.isEmpty()) qualityStream = "low"; // Default to low for streaming
+                WebcamStream.startStream(out, cameraStream, qualityStream);
+                break;
+            case "WEBCAM_STOP_STREAM":
+                WebcamStream.stopStream(out);
+                break;
+            case "WEBCAM_GET_FRAME":
+                WebcamStream.getStreamFrame(out);
+                break;
+
             // ── Remote Desktop ──
             case "REMOTE_SCREEN_SIZE":
                 RemoteDesktop.sendScreenSize(out);

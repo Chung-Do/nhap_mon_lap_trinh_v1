@@ -209,7 +209,7 @@ public class WebcamCapture {
      * Auto-detect camera dau tien co san tren he thong
      * @return Ten camera dau tien, hoac null neu khong tim thay
      */
-    private static String detectFirstCamera() {
+    public static String detectFirstCamera() {
         // Neu da detect roi thi dung cache
         if (detectedCamera != null) {
             System.out.println("[CAMERA DETECT] Using cached camera: " + detectedCamera);
