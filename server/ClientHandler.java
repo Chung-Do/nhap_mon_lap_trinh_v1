@@ -1,17 +1,10 @@
 import java.io.*;
 import java.net.*;
 import java.util.function.Consumer;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 /**
  * Xu ly 1 client tren 1 thread rieng.
  * Nhan callbacks de log va bao hieu ngat ket noi len Server GUI.
- *
- * MULTI-THREADED STREAMING:
- * - Commands thong thuong chay tren main thread
- * - Cac lenh streaming (webcam, screenshot, video) chay tren worker threads
- * - Giup tranh block khi xu ly nhieu request dong thoi
  */
 public class ClientHandler implements Runnable {
 
@@ -20,9 +13,6 @@ public class ClientHandler implements Runnable {
     private final Runnable         onDisconnect;
     private DataInputStream        in;
     private DataOutputStream       out;
-
-    // Thread pool cho cac tac vu streaming (CPU-intensive)
-    private static final ExecutorService streamingPool = Executors.newFixedThreadPool(4);
 
     public ClientHandler(Socket socket, Consumer<String> logger, Runnable onDisconnect) {
         this.socket       = socket;
@@ -57,58 +47,6 @@ public class ClientHandler implements Runnable {
     // ─────────────────────────────────────────────────────────────────────────
     private boolean processCommand(String json) throws IOException {
         String cmd = JsonUtil.extractValue(json, "command").toUpperCase();
-
-        // CAC LENH STREAMING - Chay tren worker threads de khong block
-        switch (cmd) {
-            case "SCREENSHOT":
-                executeStreaming(() -> {
-                    try {
-                        synchronized(out) { ScreenCapture.capture(out); }
-                    } catch (IOException e) {
-                        log("[STREAMING ERROR] Screenshot: " + e.getMessage());
-                    }
-                });
-                return true;
-
-            case "WEBCAM_CAPTURE":
-                String cameraCapture = JsonUtil.extractValue(json, "camera");
-                String qualityCapture = JsonUtil.extractValue(json, "quality");
-                if (qualityCapture.isEmpty()) qualityCapture = "medium";
-                final String camera = cameraCapture;
-                final String quality = qualityCapture;
-                executeStreaming(() -> {
-                    try {
-                        synchronized(out) { WebcamCapture.capture(out, camera, quality); }
-                    } catch (IOException e) {
-                        log("[STREAMING ERROR] Webcam capture: " + e.getMessage());
-                    }
-                });
-                return true;
-
-            case "WEBCAM_START_RECORD":
-                String cameraRecord = JsonUtil.extractValue(json, "camera");
-                final String recCamera = cameraRecord;
-                executeStreaming(() -> {
-                    try {
-                        synchronized(out) { WebcamCapture.startRecording(out, recCamera); }
-                    } catch (IOException e) {
-                        log("[STREAMING ERROR] Start recording: " + e.getMessage());
-                    }
-                });
-                return true;
-
-            case "WEBCAM_STOP_RECORD":
-                executeStreaming(() -> {
-                    try {
-                        synchronized(out) { WebcamCapture.stopRecording(out); }
-                    } catch (IOException e) {
-                        log("[STREAMING ERROR] Stop recording: " + e.getMessage());
-                    }
-                });
-                return true;
-        }
-
-        // CAC LENH THONG THUONG - Chay tren main thread
         switch (cmd) {
             // ── Apps ──
             case "LIST_APPS":
@@ -130,6 +68,11 @@ public class ClientHandler implements Runnable {
                 break;
             case "KILL_PROCESS":
                 ProcessManager.killProcess(out, JsonUtil.extractValue(json, "pid"));
+                break;
+
+            // ── Screen ──
+            case "SCREENSHOT":
+                ScreenCapture.capture(out);
                 break;
 
             // ── Keyboard Monitor ──
@@ -167,6 +110,19 @@ public class ClientHandler implements Runnable {
             // ── Webcam ──
             case "LIST_CAMERAS":
                 WebcamCapture.listCameras(out);
+                break;
+            case "WEBCAM_CAPTURE":
+                String cameraCapture = JsonUtil.extractValue(json, "camera");
+                String qualityCapture = JsonUtil.extractValue(json, "quality");
+                if (qualityCapture.isEmpty()) qualityCapture = "medium"; // Default
+                WebcamCapture.capture(out, cameraCapture, qualityCapture);
+                break;
+            case "WEBCAM_START_RECORD":
+                String cameraRecord = JsonUtil.extractValue(json, "camera");
+                WebcamCapture.startRecording(out, cameraRecord);
+                break;
+            case "WEBCAM_STOP_RECORD":
+                WebcamCapture.stopRecording(out);
                 break;
 
             // ── Remote Desktop ──
@@ -233,31 +189,6 @@ public class ClientHandler implements Runnable {
                 sendText("ERROR", "Lenh khong hop le: " + cmd);
         }
         return true;
-    }
-
-    /**
-     * Thuc thi task streaming tren worker thread
-     * @param task Runnable task de chay
-     */
-    private void executeStreaming(Runnable task) {
-        streamingPool.submit(() -> {
-            try {
-                log("[STREAMING THREAD] Starting task on thread: " + Thread.currentThread().getName());
-                task.run();
-                log("[STREAMING THREAD] Task completed on thread: " + Thread.currentThread().getName());
-            } catch (Exception e) {
-                log("[STREAMING THREAD ERROR] " + e.getMessage());
-                e.printStackTrace();
-            }
-        });
-    }
-
-    /**
-     * Shutdown thread pool khi server dong
-     */
-    public static void shutdownThreadPool() {
-        System.out.println("[THREAD POOL] Shutting down streaming pool...");
-        streamingPool.shutdown();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
