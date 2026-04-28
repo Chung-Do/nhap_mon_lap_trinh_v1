@@ -443,7 +443,7 @@ public class ClientGUI extends JFrame {
         streamCtrl.add(new JLabel("  Quality:"));
         qualityComboBox = new JComboBox<>(new String[]{"Low (Fast ⚡)", "Medium (Balanced)", "High (Quality 🎨)"});
         qualityComboBox.setSelectedIndex(0); // Default to Low (Fast) for streaming
-        qualityComboBox.setToolTipText("Low=320x240 (5-10 FPS), Medium=640x480 (2-5 FPS), High=1280x720 (0.5-2 FPS)");
+        qualityComboBox.setToolTipText("Low=320x240 ULTRA-FAST (25-30 FPS ⚡⚡), Medium=480x360 Fast (15-20 FPS ⚡), High=800x600 Quality (8-12 FPS)");
         streamCtrl.add(qualityComboBox);
 
         webcamStreamStartBtn = new JButton("▶  BAT DAU STREAM");
@@ -865,7 +865,9 @@ public class ClientGUI extends JFrame {
         log("Bat dau stream webcam... (Quality: " + quality + ")");
 
         // Adjust timer based on quality (lower quality = faster FPS possible)
-        int timerDelay = quality.equals("low") ? 100 : (quality.equals("medium") ? 200 : 300);
+        // AGGRESSIVE: Target 20-30 FPS for smooth streaming
+        int timerDelay = quality.equals("low") ? 33 : (quality.equals("medium") ? 50 : 100);
+        // 33ms = ~30 FPS, 50ms = 20 FPS, 100ms = 10 FPS
 
         // Khoi dong timer
         SwingUtilities.invokeLater(() -> {

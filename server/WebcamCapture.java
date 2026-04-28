@@ -308,39 +308,46 @@ public class WebcamCapture {
             System.out.println("[WEBCAM DEBUG] 📊 Quality: " + quality);
 
             // Determine resolution and compression based on quality
-            String resolution, jpegQuality;
+            // OPTIMIZED FOR HIGH FPS (targeting 20-30 FPS)
+            String resolution, jpegQuality, scaleFilter;
             switch (quality.toLowerCase()) {
                 case "low":
-                    resolution = "320x240";
-                    jpegQuality = "8"; // Lower quality but MUCH faster
-                    System.out.println("[WEBCAM DEBUG] ⚡ FAST MODE: 320x240, Q=8");
+                    resolution = "320x240";   // Small for 25-30 FPS
+                    jpegQuality = "10";       // Fast compression
+                    scaleFilter = "fast_bilinear";
+                    System.out.println("[WEBCAM DEBUG] ⚡ ULTRA-FAST: 320x240, Q=10 (target 25-30 FPS)");
                     break;
                 case "high":
-                    resolution = "1280x720";
-                    jpegQuality = "2"; // High quality, slow
-                    System.out.println("[WEBCAM DEBUG] 🎨 HIGH QUALITY: 1280x720, Q=2");
+                    resolution = "800x600";   // Medium size for 8-12 FPS
+                    jpegQuality = "4";        // Good quality
+                    scaleFilter = "bilinear";
+                    System.out.println("[WEBCAM DEBUG] 🎨 HIGH QUALITY: 800x600, Q=4 (target 8-12 FPS)");
                     break;
                 case "medium":
                 default:
-                    resolution = "320x240";  // CHANGED: Use low res for speed
-                    jpegQuality = "5"; // Medium quality, fast
-                    System.out.println("[WEBCAM DEBUG] ⚖️ BALANCED (FAST): 320x240, Q=5");
+                    resolution = "480x360";   // Small-medium for 15-20 FPS
+                    jpegQuality = "7";        // Balanced
+                    scaleFilter = "fast_bilinear";
+                    System.out.println("[WEBCAM DEBUG] ⚖️ BALANCED: 480x360, Q=7 (target 15-20 FPS)");
                     break;
             }
 
-            // Windows: dung dshow with optimization (FAST MODE)
+            // Windows: dung dshow with AGGRESSIVE optimization
             String[] command = new String[]{
                 ffmpeg,
                 "-f", "dshow",
                 "-video_size", resolution,
-                "-rtbufsize", "10M",  // Reduced buffer size for faster startup
-                "-probesize", "10M",  // Reduce probe time
-                "-fflags", "nobuffer", // No buffering
-                "-flags", "low_delay", // Low latency mode
+                "-rtbufsize", "3M",           // Smaller buffer
+                "-probesize", "32",           // MINIMAL probe (was 10M!)
+                "-analyzeduration", "0",      // NO analysis
+                "-fflags", "nobuffer+fastseek+discardcorrupt", // Aggressive flags
+                "-flags", "low_delay",
                 "-i", "video=" + cameraName,
                 "-frames:v", "1",
-                "-q:v", jpegQuality,  // JPEG quality (1-31, lower = better)
-                "-pix_fmt", "yuvj420p",  // Fast pixel format
+                "-vf", "scale=" + resolution + ":flags=" + scaleFilter,  // Fast scaling
+                "-q:v", jpegQuality,
+                "-pix_fmt", "yuvj420p",
+                "-huffman", "0",              // Fast huffman
                 "-y", tmpFile
             };
             ProcessBuilder pb = new ProcessBuilder(command);
@@ -375,10 +382,22 @@ public class WebcamCapture {
             if (f.exists() && f.length() > 0) {
                 byte[] bytes = Files.readAllBytes(f.toPath());
                 System.out.println("[WEBCAM DEBUG] Sending " + bytes.length + " bytes to client");
+
+                // Send metadata
                 out.writeUTF("BINARY");
+                out.flush(); // Flush immediately
+
                 out.writeInt(bytes.length);
-                out.write(bytes);
-                out.flush();
+                out.flush(); // Flush immediately
+
+                // Send data in chunks with immediate flush for low latency
+                int chunkSize = 1024; // 1KB chunks
+                for (int i = 0; i < bytes.length; i += chunkSize) {
+                    int len = Math.min(chunkSize, bytes.length - i);
+                    out.write(bytes, i, len);
+                    out.flush(); // Flush each chunk immediately!
+                }
+
                 f.delete();
                 System.out.println("[WEBCAM DEBUG] ========== WEBCAM CAPTURE SUCCESS ==========");
             } else {

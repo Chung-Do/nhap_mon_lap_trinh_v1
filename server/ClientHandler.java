@@ -23,8 +23,15 @@ public class ClientHandler implements Runnable {
     @Override
     public void run() {
         try {
+            // DISABLE TCP NAGLE ALGORITHM for low-latency streaming
+            socket.setTcpNoDelay(true);
+
+            // INCREASE SEND BUFFER for faster throughput
+            socket.setSendBufferSize(65536); // 64KB
+
             in  = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
-            out = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
+            // OPTIMIZED: Smaller buffer (512 bytes) for lower latency streaming
+            out = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream(), 512));
 
             // Gui welcome ngay sau khi accept
             sendText("OK", "Ket noi thanh cong! Server san sang.");
