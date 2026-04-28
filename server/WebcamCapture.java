@@ -437,14 +437,25 @@ public class WebcamCapture {
             System.out.println("[WEBCAM DEBUG] Output video: " + currentVideoFile);
 
             // Windows: record from auto-detected or specified camera
+            // OPTIMIZED for Windows Media Player compatibility
             String[] command = new String[] {
                 ffmpeg,
                 "-f", "dshow",
                 "-i", "video=" + cameraName,
                 "-framerate", "30",
                 "-video_size", "1280x720",
-                "-c:v", "libx264",
-                "-preset", "ultrafast",
+
+                // Video codec settings (Windows Media Player compatible)
+                "-c:v", "libx264",              // H.264 codec
+                "-preset", "ultrafast",          // Fast encoding
+                "-profile:v", "baseline",        // Baseline profile (most compatible)
+                "-level", "3.0",                 // H.264 level 3.0
+                "-pix_fmt", "yuv420p",          // Pixel format (required for compatibility)
+
+                // Container settings
+                "-movflags", "+faststart",       // Enable streaming/quick playback
+                "-f", "mp4",                     // Force MP4 format
+
                 "-y",
                 currentVideoFile
             };

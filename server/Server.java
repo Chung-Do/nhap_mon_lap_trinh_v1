@@ -401,6 +401,10 @@ public class Server extends JFrame {
         running = false;
         try { if (serverSocket != null) serverSocket.close(); } catch (IOException ignored) {}
         if (pool != null) pool.shutdownNow();
+
+        // Shutdown streaming thread pool
+        ClientHandler.shutdownThreadPool();
+
         SwingUtilities.invokeLater(() -> {
             clientModel.clear();
             startBtn.setEnabled(true);
