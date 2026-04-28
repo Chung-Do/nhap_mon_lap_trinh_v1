@@ -30,8 +30,8 @@ public class ClientHandler implements Runnable {
             socket.setSendBufferSize(65536); // 64KB
 
             in  = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
-            // OPTIMIZED: Smaller buffer (512 bytes) for lower latency streaming
-            out = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream(), 512));
+            // Use reasonable buffer size (4KB) - not too small, not too large
+            out = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream(), 4096));
 
             // Gui welcome ngay sau khi accept
             sendText("OK", "Ket noi thanh cong! Server san sang.");

@@ -280,134 +280,86 @@ public class WebcamCapture {
      */
     public static void capture(DataOutputStream out, String cameraName, String quality) throws IOException {
         String tmpFile = System.getProperty("java.io.tmpdir") + File.separator + "webcam_snap.jpg";
-
-        System.out.println("[WEBCAM DEBUG] ========== WEBCAM CAPTURE START ==========");
-        System.out.println("[WEBCAM DEBUG] OS: Windows");
-        System.out.println("[WEBCAM DEBUG] Camera (from client): " + (cameraName == null || cameraName.trim().isEmpty() ? "(empty)" : cameraName));
-        System.out.println("[WEBCAM DEBUG] Temp file: " + tmpFile);
+        long startTime = System.currentTimeMillis();
 
         try {
-            String ffmpeg = getFFmpeg();  // Auto-setup if needed
-            System.out.println("[WEBCAM DEBUG] FFmpeg path: " + ffmpeg);
+            String ffmpeg = getFFmpeg();
 
-            // Auto-detect camera if empty
+            // FAST: Use cached camera name if available
             if (cameraName == null || cameraName.trim().isEmpty()) {
-                System.out.println("[WEBCAM DEBUG] Camera name empty, auto-detecting...");
-                cameraName = detectFirstCamera();
-
-                if (cameraName == null) {
-                    // Neu khong detect duoc thi fallback
-                    cameraName = "Integrated Camera";
-                    System.out.println("[WEBCAM DEBUG] ⚠ Auto-detect failed, using fallback: " + cameraName);
+                if (detectedCamera != null) {
+                    cameraName = detectedCamera; // Use cached!
                 } else {
-                    System.out.println("[WEBCAM DEBUG] ✓ Auto-detected camera: " + cameraName);
+                    cameraName = detectFirstCamera();
+                    if (cameraName == null) {
+                        cameraName = "Integrated Camera";
+                    }
                 }
             }
 
-            System.out.println("[WEBCAM DEBUG] 🎥 USING CAMERA: " + cameraName);
-            System.out.println("[WEBCAM DEBUG] 📊 Quality: " + quality);
-
-            // Determine resolution and compression based on quality
-            // OPTIMIZED FOR HIGH FPS (targeting 20-30 FPS)
-            String resolution, jpegQuality, scaleFilter;
+            // SIMPLE & FAST: No scale filter, direct capture
+            String resolution, jpegQuality;
             switch (quality.toLowerCase()) {
                 case "low":
-                    resolution = "320x240";   // Small for 25-30 FPS
-                    jpegQuality = "10";       // Fast compression
-                    scaleFilter = "fast_bilinear";
-                    System.out.println("[WEBCAM DEBUG] ⚡ ULTRA-FAST: 320x240, Q=10 (target 25-30 FPS)");
+                    resolution = "320x240";
+                    jpegQuality = "10";
                     break;
                 case "high":
-                    resolution = "800x600";   // Medium size for 8-12 FPS
-                    jpegQuality = "4";        // Good quality
-                    scaleFilter = "bilinear";
-                    System.out.println("[WEBCAM DEBUG] 🎨 HIGH QUALITY: 800x600, Q=4 (target 8-12 FPS)");
+                    resolution = "640x480";
+                    jpegQuality = "5";
                     break;
                 case "medium":
                 default:
-                    resolution = "480x360";   // Small-medium for 15-20 FPS
-                    jpegQuality = "7";        // Balanced
-                    scaleFilter = "fast_bilinear";
-                    System.out.println("[WEBCAM DEBUG] ⚖️ BALANCED: 480x360, Q=7 (target 15-20 FPS)");
+                    resolution = "480x360";
+                    jpegQuality = "7";
                     break;
             }
 
-            // Windows: dung dshow with AGGRESSIVE optimization
-            String[] command = new String[]{
+            // SIMPLE FFmpeg command - NO scale filter (causes delay!)
+            ProcessBuilder pb = new ProcessBuilder(
                 ffmpeg,
                 "-f", "dshow",
                 "-video_size", resolution,
-                "-rtbufsize", "3M",           // Smaller buffer
-                "-probesize", "32",           // MINIMAL probe (was 10M!)
-                "-analyzeduration", "0",      // NO analysis
-                "-fflags", "nobuffer+fastseek+discardcorrupt", // Aggressive flags
-                "-flags", "low_delay",
+                "-rtbufsize", "1M",
+                "-probesize", "32",
+                "-analyzeduration", "0",
+                "-fflags", "nobuffer",
                 "-i", "video=" + cameraName,
                 "-frames:v", "1",
-                "-vf", "scale=" + resolution + ":flags=" + scaleFilter,  // Fast scaling
                 "-q:v", jpegQuality,
                 "-pix_fmt", "yuvj420p",
-                "-huffman", "0",              // Fast huffman
                 "-y", tmpFile
-            };
-            ProcessBuilder pb = new ProcessBuilder(command);
-
-            System.out.println("[WEBCAM DEBUG] Command: " + String.join(" ", command));
+            );
             pb.redirectErrorStream(true);
             Process p = pb.start();
 
-            // Doc output de tranh bi block NHUNG KHONG LOG (faster)
+            // Consume output (must do this!)
             new Thread(() -> {
                 try { consumeStream(p.getInputStream()); }
                 catch (Exception ignored) {}
             }).start();
 
-            int exitCode = p.waitFor();
-            System.out.println("[WEBCAM DEBUG] FFmpeg exit code: " + exitCode);
-
-            if (exitCode != 0) {
-                String errMsg = "Loi khi chup anh. Ma loi: " + exitCode;
-                System.err.println("[WEBCAM DEBUG] ERROR: " + errMsg);
-                sendError(out, errMsg);
-                return;
-            }
+            p.waitFor();
 
             File f = new File(tmpFile);
-            System.out.println("[WEBCAM DEBUG] Checking output file...");
-            System.out.println("[WEBCAM DEBUG] File exists: " + f.exists());
-            if (f.exists()) {
-                System.out.println("[WEBCAM DEBUG] File size: " + f.length() + " bytes");
-            }
-
             if (f.exists() && f.length() > 0) {
                 byte[] bytes = Files.readAllBytes(f.toPath());
-                System.out.println("[WEBCAM DEBUG] Sending " + bytes.length + " bytes to client");
 
-                // Send metadata
+                // SIMPLE: Write all at once, single flush
                 out.writeUTF("BINARY");
-                out.flush(); // Flush immediately
-
                 out.writeInt(bytes.length);
-                out.flush(); // Flush immediately
-
-                // Send data in chunks with immediate flush for low latency
-                int chunkSize = 1024; // 1KB chunks
-                for (int i = 0; i < bytes.length; i += chunkSize) {
-                    int len = Math.min(chunkSize, bytes.length - i);
-                    out.write(bytes, i, len);
-                    out.flush(); // Flush each chunk immediately!
-                }
+                out.write(bytes);
+                out.flush();
 
                 f.delete();
-                System.out.println("[WEBCAM DEBUG] ========== WEBCAM CAPTURE SUCCESS ==========");
+
+                long elapsed = System.currentTimeMillis() - startTime;
+                System.out.println("[WEBCAM] OK - " + bytes.length + " bytes in " + elapsed + "ms");
             } else {
-                String errMsg = "Khong the chup webcam.\nCan cai ffmpeg: https://ffmpeg.org/download.html";
-                System.err.println("[WEBCAM DEBUG] ERROR: " + errMsg);
-                sendError(out, errMsg);
+                sendError(out, "Khong the chup webcam");
             }
         } catch (Exception e) {
-            System.err.println("[WEBCAM DEBUG] EXCEPTION: " + e.getMessage());
-            e.printStackTrace();
+            System.err.println("[WEBCAM] ERROR: " + e.getMessage());
             sendError(out, "Loi webcam: " + e.getMessage());
         }
     }

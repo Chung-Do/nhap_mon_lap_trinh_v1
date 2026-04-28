@@ -23,9 +23,9 @@ public class ClientConnection {
             socket.setReceiveBufferSize(65536); // 64KB receive buffer
             socket.setSoTimeout(5000); // timeout cho viec doc welcome
 
-            // Smaller buffers for lower latency (512 bytes instead of 8KB)
-            out = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream(), 512));
-            in  = new DataInputStream(new BufferedInputStream(socket.getInputStream(), 512));
+            // Reasonable buffer size (4KB)
+            out = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream(), 4096));
+            in  = new DataInputStream(new BufferedInputStream(socket.getInputStream(), 4096));
 
             // Doc va bo qua welcome message tu server
             String welcome = in.readUTF();
