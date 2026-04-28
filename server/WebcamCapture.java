@@ -280,22 +280,28 @@ public class WebcamCapture {
      */
     public static void capture(DataOutputStream out, String cameraName, String quality) throws IOException {
         String tmpFile = System.getProperty("java.io.tmpdir") + File.separator + "webcam_snap.jpg";
-        long startTime = System.currentTimeMillis();
+        long t0 = System.currentTimeMillis();
+        long t1, t2, t3, t4, t5;
 
         try {
             String ffmpeg = getFFmpeg();
+            t1 = System.currentTimeMillis();
 
             // FAST: Use cached camera name if available
             if (cameraName == null || cameraName.trim().isEmpty()) {
                 if (detectedCamera != null) {
                     cameraName = detectedCamera; // Use cached!
                 } else {
+                    long detectStart = System.currentTimeMillis();
                     cameraName = detectFirstCamera();
+                    long detectEnd = System.currentTimeMillis();
+                    System.out.println("[WEBCAM TIMING] Camera detection: " + (detectEnd - detectStart) + "ms");
                     if (cameraName == null) {
                         cameraName = "Integrated Camera";
                     }
                 }
             }
+            t2 = System.currentTimeMillis();
 
             // SIMPLE & FAST: No scale filter, direct capture
             String resolution, jpegQuality;
@@ -331,7 +337,10 @@ public class WebcamCapture {
                 "-y", tmpFile
             );
             pb.redirectErrorStream(true);
+
+            System.out.println("[WEBCAM TIMING] Starting FFmpeg...");
             Process p = pb.start();
+            t3 = System.currentTimeMillis();
 
             // Consume output (must do this!)
             new Thread(() -> {
@@ -340,10 +349,13 @@ public class WebcamCapture {
             }).start();
 
             p.waitFor();
+            t4 = System.currentTimeMillis();
+            System.out.println("[WEBCAM TIMING] FFmpeg execution: " + (t4 - t3) + "ms");
 
             File f = new File(tmpFile);
             if (f.exists() && f.length() > 0) {
                 byte[] bytes = Files.readAllBytes(f.toPath());
+                t5 = System.currentTimeMillis();
 
                 // SIMPLE: Write all at once, single flush
                 out.writeUTF("BINARY");
@@ -353,8 +365,16 @@ public class WebcamCapture {
 
                 f.delete();
 
-                long elapsed = System.currentTimeMillis() - startTime;
-                System.out.println("[WEBCAM] OK - " + bytes.length + " bytes in " + elapsed + "ms");
+                long t6 = System.currentTimeMillis();
+
+                System.out.println("[WEBCAM TIMING] Breakdown:");
+                System.out.println("  Setup: " + (t1 - t0) + "ms");
+                System.out.println("  Camera: " + (t2 - t1) + "ms");
+                System.out.println("  FFmpeg start: " + (t3 - t2) + "ms");
+                System.out.println("  FFmpeg wait: " + (t4 - t3) + "ms <<<< CRITICAL");
+                System.out.println("  Read file: " + (t5 - t4) + "ms");
+                System.out.println("  Network send: " + (t6 - t5) + "ms");
+                System.out.println("  TOTAL: " + (t6 - t0) + "ms");
             } else {
                 sendError(out, "Khong the chup webcam");
             }

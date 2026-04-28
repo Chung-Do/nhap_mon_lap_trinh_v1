@@ -872,21 +872,40 @@ public class ClientGUI extends JFrame {
         // Khoi dong timer
         SwingUtilities.invokeLater(() -> {
             final long[] lastT = {System.currentTimeMillis()};
+            final int[] skipCount = {0};
             webcamStreamTimer = new Timer(timerDelay, ev -> {
-                if (webcamStreamBusy.get()) return;
+                    skipCount[0]++;
+                    System.out.println("[STREAM] SKIPPED frame (busy) - Total skipped: " + skipCount[0]);
+                    return;
+                }
                 webcamStreamBusy.set(true);
+                long requestStart = System.currentTimeMillis();
                 socketExec.submit(() -> {
                     try {
+                        System.out.println("[STREAM] Sending request...");
                         conn.sendCommand(JsonUtil.buildCommand("WEBCAM_CAPTURE", "camera", cameraName, "quality", quality));
+                        long t1 = System.currentTimeMillis();
+
                         String marker = conn.readTextResponse();
+                        long t2 = System.currentTimeMillis();
+                        System.out.println("[STREAM] Got marker in " + (t2-t1) + "ms");
+
                         if ("BINARY".equals(marker)) {
                             byte[] data = conn.readBinaryData();
+                            long t3 = System.currentTimeMillis();
+                            System.out.println("[STREAM] Received " + data.length + " bytes in " + (t3-t2) + "ms");
+
                             BufferedImage img = ImageIO.read(new ByteArrayInputStream(data));
+                            long t4 = System.currentTimeMillis();
+                            System.out.println("[STREAM] Decoded image in " + (t4-t3) + "ms");
+
                             if (img != null) {
                                 webcamStreamImage = img;
                                 long now = System.currentTimeMillis();
+                                long totalTime = now - requestStart;
                                 String fps = String.format("%.1f", 1000.0 / (now - lastT[0]));
                                 lastT[0] = now;
+                                System.out.println("[STREAM] TOTAL frame time: " + totalTime + "ms, FPS: " + fps);
                                 SwingUtilities.invokeLater(() -> {
                                     webcamStreamPanel.repaint();
                                     webcamStreamFpsLabel.setText("  FPS: " + fps);
@@ -894,6 +913,8 @@ public class ClientGUI extends JFrame {
                             }
                         }
                     } catch (Exception ex) {
+                        System.err.println("[STREAM] ERROR: " + ex.getMessage());
+                        ex.printStackTrace();
                         log("LOI webcam stream: " + ex.getMessage());
                         SwingUtilities.invokeLater(() -> stopWebcamStream());
                     } finally {
