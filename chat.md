@@ -2191,3 +2191,174 @@ Option 1: Download trực tiếp bằng browser
 https://github.com/chungdo/nhap_mon_lap_trinh_v1/releases/download/latest/RemotePC-Server.zip
 Option 2: Download bằng wget/curl (trong script)
 Tôi sẽ tạo script tự động download và deploy cho bạn.
+
+
+-----------
+Hãy giải thích với tôi kỹ hơn về cách client và server sẽ giao tiếp với nhau thế nào khi chúng ta bắt đầu stream bằng mmpeg sau khi đã nhập tên camera. là sao hình ảnh có thể gửi được iên tục
+-----------
+
+FFMPEG STREAMING ARCHITECTURE
+TỔNG QUAN LUỒNG GIAO TIẾP
+Khi sử dụng FFmpeg cho webcam streaming, hệ thống hoạt động dựa trên mô hình pipeline architecture với các thành phần độc lập xử lý song song.
+
+GIAI ĐOẠN 1: KHỞI TẠO STREAM
+Bước 1: Discovery - Liệt kê thiết bị
+
+Client gửi request yêu cầu danh sách camera. Server thực thi FFmpeg với tham số -list_devices để query DirectShow API của Windows. Command này trả về danh sách các video input devices có sẵn trong hệ thống.
+
+Bước 2: Negotiation - Thỏa thuận tham số
+
+Client chọn camera cụ thể và gửi các tham số stream:
+
+Device name (tên camera)
+Frame rate (FPS)
+Resolution (độ phân giải)
+Codec preferences (thuật toán nén)
+GIAI ĐOẠN 2: PIPELINE EXECUTION
+FFmpeg Process
+
+Server khởi động FFmpeg như một process riêng biệt với các tham số:
+
+Input source: DirectShow video device
+Video codec: H.264 (standard compression algorithm)
+Encoding preset: ultrafast (trade-off quality for speed)
+Tuning: zerolatency (optimize for real-time streaming)
+Output format: raw H.264 stream hoặc MPEG-TS
+FFmpeg thực hiện 3 nhiệm vụ liên tục:
+
+Capture: Đọc raw frames từ camera driver qua DirectShow API với tần suất cố định (ví dụ 15 FPS = mỗi 66.67ms)
+
+Encode: Nén mỗi frame bằng H.264 codec
+
+Input: 640×480×3 bytes (RGB) = 921,600 bytes
+Output: ~25,000 bytes (compression ratio ~97%)
+Output: Ghi encoded data vào stdout stream
+
+Java Server Thread
+
+Java application spawn một thread chuyên biệt để xử lý FFmpeg output:
+
+Đọc từ InputStream của FFmpeg process
+Method read() là blocking call - thread sẽ chờ cho đến khi có data
+Mỗi lần đọc buffer 4KB (hoặc tùy chỉnh)
+Ghi ngay lập tức vào socket OutputStream
+Không có buffering hay accumulation logic
+Network Layer
+
+TCP socket duy trì persistent connection:
+
+Data được gửi dưới dạng continuous byte stream
+TCP protocol đảm bảo ordered delivery và error correction
+Flow control tự động điều chỉnh sending rate dựa trên network conditions
+Client Decoder
+
+Client thực thi FFplay (hoặc decoder tương tự):
+
+Đọc H.264 stream từ socket
+Decode frames về raw pixels
+Render lên display buffer
+PHÂN TÍCH CONCURRENCY
+Parallel Processing Model:
+
+
+[Camera Hardware]
+      ↓ (66ms intervals)
+[FFmpeg: Capture Thread]
+      ↓ (encoding ~10ms)
+[FFmpeg: Encoder Thread]
+      ↓ (writing to pipe)
+[Java: Reader Thread]
+      ↓ (socket write)
+[Network: TCP Stack]
+      ↓ (transmission ~2ms on LAN)
+[Client: Decoder Thread]
+      ↓ (decoding ~10ms)
+[Display: Render]
+Các stage này hoạt động độc lập và song song:
+
+Trong khi Java gửi frame N, FFmpeg đã encode frame N+1
+Trong khi Client decode frame N, Server đã capture frame N+2
+TẠI SAO DATA FLOW LIÊN TỤC?
+1. Hardware Timing
+
+Camera sensor capture với clock rate cố định (15 FPS = 66.67ms period). Đây là hardware interrupt-driven process, không phụ thuộc software.
+
+2. Process Isolation
+
+FFmpeg là process riêng với own scheduling và memory space. Nó không bị block bởi Java application logic.
+
+3. Blocking I/O Pattern
+
+Java thread sử dụng blocking read:
+
+InputStream.read() chờ cho đến khi FFmpeg produce data
+Ngay khi có data, read returns và code tiếp tục
+Write ngay vào socket, sau đó loop lại để đợi data tiếp theo
+Đây là producer-consumer pattern với FFmpeg là producer và Java là consumer.
+
+4. TCP Stream Properties
+
+TCP socket không có concept của "messages" - chỉ có continuous byte stream. Data được gửi đi ngay khi available, không cần đợi message boundaries.
+
+5. Pipeline Depth
+
+Mỗi stage có buffer riêng:
+
+OS kernel buffer cho pipe giữa FFmpeg và Java
+Socket send/receive buffers
+Network packet buffers
+→ Các stage không bị block lẫn nhau ngay cả khi có delay nhỏ
+
+BANDWIDTH ANALYSIS
+Data Rate Calculation:
+
+
+Frame size: 25 KB (after H.264 compression)
+Frame rate: 15 FPS
+Bitrate: 25 KB × 15 = 375 KB/s = 3 Mbps
+
+LAN capacity: 1 Gbps (Gigabit Ethernet)
+Utilization: 3 / 1000 = 0.3%
+Network có capacity dư thừa rất lớn, nên không xảy ra congestion. TCP flow control không cần throttle sending rate.
+
+LATENCY BREAKDOWN
+End-to-end latency từ camera đến display:
+
+Camera capture: 0ms (starting point)
+FFmpeg encoding: ~10-15ms
+Java pipe read/write: ~1-2ms
+Network transmission (LAN): ~1-3ms
+Client decode: ~10-15ms
+Display rendering: ~16ms (vsync)
+Total: ~40-50ms
+
+Đây là acceptable latency cho remote monitoring application. Với UDP có thể giảm xuống ~20-30ms nhưng trade-off là potential packet loss.
+
+KEY ARCHITECTURAL DECISIONS
+Tại sao dùng FFmpeg thay vì pure Java?
+
+FFmpeg có hardware acceleration support (GPU encoding)
+Highly optimized C/C++ implementation
+Industry-standard codecs với best compression ratio
+Cross-platform camera access (DirectShow/V4L2/AVFoundation)
+Tại sao dùng TCP thay vì UDP?
+
+Project requirement là guaranteed delivery
+LAN environment có low packet loss → TCP retransmission overhead minimal
+Simpler implementation (không cần custom packet loss handling)
+TCP flow control prevents buffer overflow
+Tại sao chunk size 4KB?
+
+Balance giữa latency và overhead
+4KB là common OS page size → efficient memory operations
+Không quá lớn để avoid blocking, không quá nhỏ để avoid excessive syscalls
+TÓM TẮT
+Streaming được duy trì liên tục nhờ:
+
+Hardware-driven capture với timing độc lập
+Process isolation giữa FFmpeg và Java
+Blocking I/O pattern đảm bảo immediate data forwarding
+TCP persistent connection duy trì byte stream
+Pipeline parallelism cho phép overlapping execution
+Adequate bandwidth trên LAN (utilization <1%)
+Data flow không phải là discrete messages mà là continuous stream với backpressure được handle tự động bởi TCP flow control.
