@@ -11,7 +11,10 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  # ══════════════════════════════════════════════
+  #  Windows Build
+  # ══════════════════════════════════════════════
+  build-windows:
     runs-on: windows-latest
 
     steps:
@@ -40,25 +43,120 @@ jobs:
       if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')
       run: |
         cd dist\client
-        Compress-Archive -Path RemotePC-Client -DestinationPath ..\..\RemotePC-Client.zip
+        Compress-Archive -Path RemotePC-Client -DestinationPath ..\..\RemotePC-Client-Windows.zip
         cd ..\..
         cd dist\server
-        Compress-Archive -Path RemotePC-Server -DestinationPath ..\..\RemotePC-Server.zip
+        Compress-Archive -Path RemotePC-Server -DestinationPath ..\..\RemotePC-Server-Windows.zip
       shell: powershell
 
     - name: Upload Client Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: RemotePC-Client
+        name: RemotePC-Client-Windows
         path: dist/client/RemotePC-Client
         retention-days: 30
 
     - name: Upload Server Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: RemotePC-Server
+        name: RemotePC-Server-Windows
         path: dist/server/RemotePC-Server
         retention-days: 30
+
+  # ══════════════════════════════════════════════
+  #  Ubuntu/Linux Build
+  # ══════════════════════════════════════════════
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Java JDK
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '21'
+
+    - name: Build Client
+      run: |
+        echo "Building Client..."
+        chmod +x build_client.sh
+        bash build_client.sh
+
+    - name: Build Server
+      run: |
+        echo "Building Server..."
+        chmod +x build_server.sh
+        bash build_server.sh
+
+    - name: Create Release Zip Files
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')
+      run: |
+        # Package JAR files + run scripts
+        mkdir -p release-linux/RemotePC-Client
+        cp build/client/client.jar release-linux/RemotePC-Client/
+        echo '#!/bin/bash' > release-linux/RemotePC-Client/run.sh
+        echo 'cd "$(dirname "$0")" && java -jar client.jar' >> release-linux/RemotePC-Client/run.sh
+        chmod +x release-linux/RemotePC-Client/run.sh
+
+        mkdir -p release-linux/RemotePC-Server
+        cp build/server/server.jar release-linux/RemotePC-Server/
+        echo '#!/bin/bash' > release-linux/RemotePC-Server/run.sh
+        echo 'cd "$(dirname "$0")" && java -jar server.jar' >> release-linux/RemotePC-Server/run.sh
+        chmod +x release-linux/RemotePC-Server/run.sh
+
+        # Also package native app if jpackage succeeded
+        if [ -d "dist/client/RemotePC-Client" ]; then
+          cp -r dist/client/RemotePC-Client release-linux/RemotePC-Client/app
+        fi
+        if [ -d "dist/server/RemotePC-Server" ]; then
+          cp -r dist/server/RemotePC-Server release-linux/RemotePC-Server/app
+        fi
+
+        cd release-linux
+        zip -r ../RemotePC-Client-Linux.zip RemotePC-Client/
+        zip -r ../RemotePC-Server-Linux.zip RemotePC-Server/
+
+    - name: Upload Client Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: RemotePC-Client-Linux
+        path: release-linux/RemotePC-Client
+        retention-days: 30
+
+    - name: Upload Server Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: RemotePC-Server-Linux
+        path: release-linux/RemotePC-Server
+        retention-days: 30
+
+  # ══════════════════════════════════════════════
+  #  Release (after both builds succeed)
+  # ══════════════════════════════════════════════
+  release:
+    needs: [build-windows, build-linux]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+
+    - name: Re-zip artifacts
+      run: |
+        cd artifacts
+        for dir in RemotePC-*; do
+          if [ -d "$dir" ]; then
+            zip -r "../${dir}.zip" "$dir/"
+          fi
+        done
+        cd ..
+        ls -la *.zip
 
     - name: Update Latest Release
       if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
@@ -69,12 +167,20 @@ jobs:
         body: |
           Tự động build từ commit ${{ github.sha }}
 
-          **Download:**
-          - RemotePC-Client.zip: Client application (requires JRE 14+)
-          - RemotePC-Server.zip: Server application (requires JRE 14+)
+          **Download Windows:**
+          - RemotePC-Client-Windows.zip: Client app (Windows EXE)
+          - RemotePC-Server-Windows.zip: Server app (Windows EXE)
+
+          **Download Linux/Ubuntu:**
+          - RemotePC-Client-Linux.zip: Client app (JAR + run.sh)
+          - RemotePC-Server-Linux.zip: Server app (JAR + run.sh)
+
+          **Yêu cầu:** JRE 14+ (khuyến nghị JDK 21)
         files: |
-          RemotePC-Client.zip
-          RemotePC-Server.zip
+          RemotePC-Client-Windows.zip
+          RemotePC-Server-Windows.zip
+          RemotePC-Client-Linux.zip
+          RemotePC-Server-Linux.zip
         prerelease: false
         draft: false
       env:
@@ -85,7 +191,9 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          RemotePC-Client.zip
-          RemotePC-Server.zip
+          RemotePC-Client-Windows.zip
+          RemotePC-Server-Windows.zip
+          RemotePC-Client-Linux.zip
+          RemotePC-Server-Linux.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
